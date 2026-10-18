@@ -18,6 +18,7 @@ a = Analysis(
     datas=[
         (str(ROOT / "web"), "web"),
         (str(ROOT / "app" / "rules"), "app/rules"),
+        (str(ROOT / "app" / "admin_secret.py"), "app"),
         (str(ROOT / "samples"), "samples"),
     ],
     hiddenimports=[],

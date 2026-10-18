@@ -58,6 +58,7 @@ class Job:
         self.ev_base = 0
         self.log: list[dict] = []
         self.usage = {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0, "estimated": 0}
+        self.exports = {}
         self.files = []
         for f in files:
             self.files.append({
@@ -95,12 +96,15 @@ class Job:
             return list(self.events[start:]), self.ev_base + len(self.events)
 
     # ---------- 进度 ----------
-    def set_pct(self, file_id: str, pct):
+    def set_pct(self, file_id: str, pct, allow_back: bool = False):
         with self.lock:
             try:
-                self.file_pct[file_id] = max(0, min(100, int(round(float(pct)))))
+                new = max(0, min(100, int(round(float(pct)))))
             except (TypeError, ValueError):
                 return
+            old = self.file_pct.get(file_id, 0)
+            # 默认只进不退，避免心跳平滑值与真实步骤值互相拉扯
+            self.file_pct[file_id] = new if (allow_back or new >= old) else old
             self._recalc_pct()
 
     def _recalc_pct(self):
@@ -192,10 +196,34 @@ class Manager:
         t.start()
         return job
 
+    def _heartbeat(self, job: Job):
+        """看门狗：模型长时间生成时定期写日志，避免界面看起来卡死。"""
+        import time as _t
+        waited = 0
+        while True:
+            _t.sleep(15)
+            if job.status != "running":
+                return
+            if job.cancel.is_set():
+                return
+            waited += 15
+            alive = [f for f in job.files if f["status"] == "running"]
+            if not alive:
+                continue
+            with job.lock:
+                chars = sum(len((e.get("text") or "")) for e in job.events)
+            job.add_log("模型仍在生成…已等待 %d 秒，已收到约 %d 字输出" % (waited, chars))
+            # 长时间静默时轻微推进进度条，避免观感上「卡死」
+            for f in alive:
+                cur = job.file_pct.get(f["file_id"], 0)
+                if cur < 95:
+                    job.set_pct(f["file_id"], min(95, cur + 2))
+
     def _run(self, job: Job):
         job.status = "running"
         job.add_log("开始%s（力度：%s），共 %d 份稿件"
                     % (STAGE_LABEL.get(job.stage), job.level, len(job.files)))
+        threading.Thread(target=self._heartbeat, args=(job,), daemon=True).start()
         for fe in job.files:
             if job.cancel.is_set():
                 break
@@ -358,6 +386,7 @@ class Manager:
         data["updated"] = _now()
         data["name"] = data["files"][0]["name"] if data["files"] else ""
         data["names"] = [f.get("name") for f in data["files"]]
+        data["pricing"] = dict((job.config or {}).get("pricing") or {})
         return data
 
     # ---------- 历史记录 ----------
@@ -453,6 +482,11 @@ class Manager:
         job.log = list(snap.get("log") or [])
         job.usage = dict(snap.get("usage") or job.usage)
         job.exports = dict(snap.get("exports") or {})
+        pricing = snap.get("pricing")
+        if isinstance(pricing, dict) and pricing:
+            # 历史记录按当时的单价结算，不因后来改价而变化
+            job.config = dict(self.cfg)
+            job.config["pricing"] = pricing
         for fe_snap, fe_job in zip(raw_files, job.files):
             fe_job["status"] = fe_snap.get("status") or "done"
             fe_job["error"] = fe_snap.get("error")

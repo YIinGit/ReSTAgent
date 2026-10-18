@@ -51,10 +51,8 @@ DEFAULTS = {
     "pricing": {"input_per_m": 10.0, "output_per_m": 30.0, "currency": "CNY"},
     # 规则库开关：{规则ID: false 表示关闭}；未出现的规则默认启用
     "rules": {},
-    # 管理员模式（密码只存盐值 + sha256 哈希；默认密码见 app/admin.py）
+    # 管理员模式（密码的盐与哈希保存在源代码 app/admin_secret.py，不写这里）
     "admin": {
-        "password_salt": "",
-        "password_hash": "",
         "staff": [],
         "notice": "",
         "version": APP_VERSION,
@@ -107,10 +105,10 @@ def masked(cfg: dict) -> dict:
 
 
 def mask_admin(admin: dict) -> dict:
-    """管理员配置的只读视图：不给密码哈希，Key 只给是否已设置。"""
+    """管理员配置的只读视图：密码不在这里，Key 只给是否已设置。"""
     out = copy.deepcopy(admin or {})
-    out["password_set"] = bool(out.pop("password_hash", ""))
-    out.pop("password_salt", None)
+    out.pop("password_salt", None)     # 兼容旧配置：即便有残留也不外泄
+    out.pop("password_hash", None)
     ad = out.get("api_defaults") or {}
     key = ad.get("api_key") or ""
     ad["api_key_set"] = bool(key)

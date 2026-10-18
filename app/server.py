@@ -177,6 +177,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(info)
             if path == "/api/config":
                 patch = self._json_body()
+                patch.pop("admin", None)   # 管理员配置只能走 /api/admin/*
+                patch.pop("rules", None)   # 规则开关只能走 /api/rules/toggle
                 cfg = config_mod.save(patch)
                 MANAGER.cfg = cfg
                 return self._json(config_mod.masked(cfg))
@@ -350,10 +352,8 @@ class Handler(BaseHTTPRequestHandler):
                                "health": self._health()})
         if action == "password":
             body = self._json_body()
-            patch = admin_mod.password_patch(str(body.get("new_password") or ""))
-            cfg = config_mod.save({"admin": patch})
-            MANAGER.cfg = cfg
-            return self._json({"ok": True, "admin": config_mod.masked(cfg)["admin"]})
+            admin_mod.set_password(str(body.get("new_password") or ""))
+            return self._json({"ok": True})
         return self._error("未知操作", 404)
 
     def _stream(self, job_id: str):
@@ -411,7 +411,7 @@ class Handler(BaseHTTPRequestHandler):
                 if idle > 3600:   # 约 12 分钟没有任何结束迹象：主动断开，客户端可重连
                     break
                 time.sleep(0.2)
-        except (BrokenPipeError, ConnectionResetError, OSError):
+        except (BrokenPipeError, ConnectionResetError, OSError, ValueError):
             pass
         return None
 

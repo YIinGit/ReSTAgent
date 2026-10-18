@@ -15,3 +15,5 @@ __pycache__/
 build/
 dist/
 *.spec.bak
+
+_package/

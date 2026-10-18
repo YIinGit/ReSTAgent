@@ -1,6 +1,7 @@
 """审稿流水线：分块 → 多轮调用 → 校验定位 → 去重合并。"""
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import math
 import re
@@ -16,6 +17,7 @@ CAT_FALLBACK = {"zero": "学术错误", "first": "结构", "second": "病句", "
 QUALITY_MAP = {
     "high": "high", "medium": "medium", "low": "low",
     "高": "high", "中": "medium", "低": "low",
+    "高（选用）": "high", "中（需修改并提出意见）": "medium", "低（不选用）": "low",
     "1级": "high", "特策": "high", "特别策划": "high",
     "2级": "medium",
     "3级": "low",
@@ -124,8 +126,11 @@ class _Steps:
         self.done = 0
 
     def __call__(self, msg):
+        # 百分比按「已完成步数」算：这一步刚开始时还没完成，别提前报满
+        completed = min(self.total, self.done)
         self.done = min(self.total, self.done + 1)
-        _emit(self.cb, msg, int(round(self.done * 100.0 / self.total)))
+        pct = int(round(completed * 100.0 / self.total))
+        _emit(self.cb, msg, min(95, pct))   # 100% 只由任务真正结束时写入
 
 
 def _norm_verdict(v):
@@ -134,12 +139,12 @@ def _norm_verdict(v):
         return None
     out = dict(v)
     raw = out.get("quality", out.get("suggested_grade"))
+    grade = ""
     if raw is not None and str(raw).strip():
-        out["quality"] = QUALITY_MAP.get(str(raw).strip(), "")
-    else:
-        out["quality"] = ""
-    if out["quality"] not in ("high", "medium", "low"):
-        out["quality"] = ""
+        txt = str(raw).strip()
+        grade = QUALITY_MAP.get(txt.lower()) or QUALITY_MAP.get(txt) \
+            or QUALITY_MAP.get(txt.replace(" ", "")) or ""
+    out["quality"] = grade if grade in ("high", "medium", "low") else ""
     out.pop("suggested_grade", None)
     return out
 
@@ -238,6 +243,12 @@ class Reviewer:
                             verdict=data.get("verdict"), progress=progress)
 
     # -------- 一审 --------
+    def _outline_first(self, doc, cancel):
+        return self._ask([
+            {"role": "system", "content": prompts.system_prompt("first", self.level, self.cfg)},
+            {"role": "user", "content": prompts.outline_user_message(doc, sample_text(doc), "first")},
+        ], cancel)
+
     def _first(self, doc, progress, cancel):
         paras = [p for p in doc.paras if p.text.strip()]
         chunks = make_chunks(paras, self.budget)
@@ -245,17 +256,12 @@ class Reviewer:
         total += 1 if self.level in ("strict", "max") else 0
         steps = _Steps(progress, total)
         all_findings, structures = [], []
+        outline_fut, pool = None, None
         if self.level != "light":
             steps("一审：整体结构与逻辑通读")
-            try:
-                data = self._ask([
-                    {"role": "system", "content": prompts.system_prompt("first", self.level, self.cfg)},
-                    {"role": "user", "content": prompts.outline_user_message(doc, sample_text(doc), "first")},
-                ], cancel)
-                all_findings += data.get("findings") or []
-                structures += data.get("structure_suggestions") or []
-            except Exception as e:
-                self.notes.append("整体通读失败：%s" % e)
+            # 大纲通读与第 1 块并行发出，缩短首次出活的等待
+            pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            outline_fut = pool.submit(self._outline_first, doc, cancel)
         for i, chunk in enumerate(chunks, 1):
             steps("一审：第 %d/%d 块" % (i, len(chunks)))
             prev_p = paras[paras.index(chunk[0]) - 1] if paras.index(chunk[0]) > 0 else None
@@ -270,6 +276,15 @@ class Reviewer:
                 structures += data.get("structure_suggestions") or []
             except Exception as e:
                 self.notes.append("第 %d 块审读失败：%s" % (i, e))
+        if outline_fut is not None:
+            try:
+                data = outline_fut.result()
+                all_findings += data.get("findings") or []
+                structures += data.get("structure_suggestions") or []
+            except Exception as e:
+                self.notes.append("整体通读失败：%s" % e)
+            finally:
+                pool.shutdown(wait=False)
         if self.level in ("strict", "max"):
             all_findings += self._review_pass(doc, all_findings, steps, cancel)
         return self._finish(doc, findings=all_findings, progress=progress, structures=structures)
@@ -525,3 +540,4 @@ def estimate(cfg: dict, stage: str, level: str, chars: int) -> dict:
     cost = round((in_tokens * pin + out_tokens * pout) / 1000000.0, 4)
     return {"calls": calls, "in_tokens": in_tokens, "out_tokens": out_tokens,
             "cost": cost, "price_in": pin, "price_out": pout, "currency": "CNY"}
+

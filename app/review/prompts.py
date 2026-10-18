@@ -6,20 +6,35 @@ import pathlib
 from .. import paths, rules_lib
 
 RULE_DIR = paths.resource("app", "rules")
-_cache: dict[str, str] = {}
-_parsed: dict[str, tuple] = {}
+_cache: dict[str, tuple[float, str]] = {}
+_parsed: dict[str, tuple[float, tuple]] = {}
 
 STAGE_NAME = {"zero": "零审", "first": "一审", "second": "二审", "third": "三审"}
 CATEGORIES = ["学术错误", "结构", "文风", "敏感", "冗余", "病句", "错别字",
               "用词", "术语", "标点", "数字与西文", "排版"]
 
 
+def _rule_file(stage: str) -> pathlib.Path:
+    return RULE_DIR / ("%s_stage.md" % stage)
+
+
+def _mtime(stage: str) -> float:
+    try:
+        return _rule_file(stage).stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def _read(stage: str) -> str:
-    if stage in _cache:
-        return _cache[stage]
-    f = RULE_DIR / ("%s_stage.md" % stage)
+    """读取规则文件；文件改动（mtime 变化）后自动重新读取，无需重启。"""
+    stamp = _mtime(stage)
+    hit = _cache.get(stage)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    f = _rule_file(stage)
     text = f.read_text(encoding="utf-8") if f.exists() else ""
-    _cache[stage] = text
+    _cache[stage] = (stamp, text)
+    _parsed.pop(stage, None)
     return text
 
 
@@ -46,9 +61,13 @@ def _parse(text: str) -> tuple[str, str, list[dict]]:
 
 
 def parse_rule_file(stage: str) -> tuple[str, str, list[dict]]:
-    if stage not in _parsed:
-        _parsed[stage] = _parse(_read(stage))
-    return _parsed[stage]
+    stamp = _mtime(stage)
+    hit = _parsed.get(stage)
+    if hit and hit[0] == stamp:
+        return hit[1]
+    parsed = _parse(_read(stage))
+    _parsed[stage] = (stamp, parsed)
+    return parsed
 
 
 def rule_id(stage: str, section_title: str) -> str:
