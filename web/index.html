@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReSTAgent · AI 文稿审读</title>
+<script>try{var t=localStorage.getItem("restagent.theme");if(!t)t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="icon" href="/static/icon.png" />
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">R</div>
+    <div>
+      <h1>ReSTAgent <span id="appVersion" class="ver">v0.1</span></h1>
+      <p class="tagline">AI 文稿审读 · 依据《文稿培训资料 V2.5.0》</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span id="apiState" class="pill pill-muted">检测中…</span>
+    <button id="btnTheme" class="btn btn-ghost" title="切换浅色 / 深色">深色</button>
+    <button id="btnRules" class="btn btn-ghost">规则库</button>
+    <button id="btnAdmin" class="btn btn-ghost">管理员</button>
+    <button id="btnSettings" class="btn btn-ghost">设置</button>
+  </div>
+</header>
+<div id="noticeBar" class="notice is-hidden"></div>
+
+<main>
+  <div class="layout">
+    <!-- ============ 历史 ============ -->
+    <aside class="hist-col">
+      <div class="panel hist-panel">
+        <div class="panel-head">
+          <h2>历史</h2>
+          <button id="btnRefreshHistory" class="btn btn-mini">刷新</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </aside>
+
+    <div class="main-col">
+      <!-- ============ 第一步：选稿与参数 ============ -->
+      <section id="viewSetup" class="view">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>1 · 选择稿件</h2>
+            <span class="hint">支持一次选择多份 .docx</span>
+          </div>
+          <label id="drop" class="drop">
+            <input id="fileInput" type="file" accept=".docx" multiple hidden />
+            <div class="drop-icon">＋</div>
+            <div class="drop-main">把 Word 文件拖到这里，或点击选择</div>
+            <div class="drop-sub">审稿不会改动原文件，导出的是新文件</div>
+          </label>
+          <div class="demo-row">
+            <button id="btnDemo" class="btn btn-mini">用示例稿件试一次</button>
+            <span class="hint">示例稿内含直引号、的/地误用、半角标点等典型错误</span>
+          </div>
+          <div id="fileList" class="file-list"></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head"><h2>2 · 审稿环节</h2></div>
+            <div class="stage-list" id="stageList">
+              <button class="stage" data-stage="zero">
+                <span class="stage-name">零审</span>
+                <span class="stage-desc">录用把关：属性、立论、内容密度、难度、体例</span>
+              </button>
+              <button class="stage" data-stage="first">
+                <span class="stage-name">一审</span>
+                <span class="stage-desc">内容与结构：学术错误、逻辑、文风、结构标注</span>
+              </button>
+              <button class="stage" data-stage="second">
+                <span class="stage-name">二审</span>
+                <span class="stage-desc">文字与语法：病句、错别字、用词、标点、中西混排</span>
+              </button>
+              <button class="stage is-disabled" disabled>
+                <span class="stage-name">三审</span>
+                <span class="stage-desc">排版后检查（需 PDF 版式，暂未开放）</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>3 · 审稿力度</h2></div>
+            <div class="level-list" id="levelList">
+              <button class="level" data-level="light">
+                <span class="level-name">轻</span><span class="level-desc">单遍速览 · 只报必改</span>
+              </button>
+              <button class="level" data-level="standard">
+                <span class="level-name">标准</span><span class="level-desc">全规则单遍 · 日常使用</span>
+              </button>
+              <button class="level" data-level="strict">
+                <span class="level-name">严格</span><span class="level-desc">逐块审 + 复核轮</span>
+              </button>
+              <button class="level" data-level="max">
+                <span class="level-name">极致</span><span class="level-desc">多视角 + 交叉复核</span>
+              </button>
+            </div>
+            <div class="est" id="estimate">选择稿件后显示预估</div>
+          </div>
+        </div>
+
+        <div class="startbar">
+          <div class="startbar-info" id="startInfo">请先选择稿件</div>
+          <button id="btnStart" class="btn btn-primary btn-lg" disabled>开始审稿</button>
+        </div>
+      </section>
+
+      <!-- ============ 第二步：审稿中 ============ -->
+      <section id="viewRunning" class="view is-hidden">
+        <div class="panel running">
+          <div class="running-head">
+            <div>
+              <h2 id="runTitle">正在审稿</h2>
+              <p class="hint" id="runMsg">准备中…</p>
+            </div>
+            <div class="running-right">
+              <span id="runPct" class="run-pct">0%</span>
+              <button id="btnCancel" class="btn btn-ghost">停止</button>
+            </div>
+          </div>
+          <div class="progress"><div id="progressFill" class="progress-fill"></div></div>
+          <div class="run-files" id="runFiles"></div>
+          <div id="runUsage" class="run-usage hint"></div>
+          <div class="logbox" id="logBox"></div>
+        </div>
+      </section>
+
+      <!-- ============ 第三步：结果 ============ -->
+      <section id="viewResults" class="view is-hidden">
+        <div class="resultbar">
+          <div class="resultbar-left">
+            <button id="btnNew" class="btn btn-ghost">← 新建审稿</button>
+            <div class="tabs" id="fileTabs"></div>
+          </div>
+          <div class="resultbar-right">
+            <span class="counts" id="counts"></span>
+            <span class="usage" id="usageInfo"></span>
+            <button id="btnExportAll" class="btn btn-ghost">全部导出</button>
+            <button id="btnExport" class="btn btn-primary">导出 Word</button>
+          </div>
+        </div>
+        <div id="exportBanner" class="banner is-hidden"></div>
+
+        <div class="workbench">
+          <aside class="side">
+            <div class="filters">
+              <select id="filterSev" class="select">
+                <option value="all">全部级别</option>
+                <option value="must">仅必改</option>
+                <option value="should">建议</option>
+                <option value="suggest">可选</option>
+              </select>
+              <select id="filterStatus" class="select">
+                <option value="all">全部状态</option>
+                <option value="pending">待处理</option>
+                <option value="accepted">已接受</option>
+                <option value="rejected">已忽略</option>
+              </select>
+            </div>
+            <div class="bulk">
+              <button id="btnAcceptMust" class="btn btn-mini">接受全部必改</button>
+              <button id="btnRejectSuggest" class="btn btn-mini">忽略全部可选</button>
+            </div>
+            <div id="findingList" class="finding-list"></div>
+          </aside>
+          <section class="detail" id="detail">
+            <div class="empty">选择左侧一条意见查看详情</div>
+          </section>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<!-- ============ 设置 ============ -->
+<div id="drawerMask" class="mask is-hidden"></div>
+<aside id="drawer" class="drawer is-hidden">
+  <div class="drawer-head">
+    <h2>设置</h2>
+    <button id="btnCloseDrawer" class="btn btn-ghost">关闭</button>
+  </div>
+  <div class="drawer-body">
+    <label class="field">
+      <span>API Base URL（OpenAI 兼容）</span>
+      <input id="cfgBase" class="input" placeholder="https://api.deepseek.com/v1" />
+    </label>
+    <label class="field">
+      <span>API Key <em id="keyHint" class="muted"></em></span>
+      <input id="cfgKey" class="input" type="password" placeholder="留空则不修改" />
+    </label>
+    <div class="field">
+      <span>各力度使用的模型</span>
+      <div class="models">
+        <label>轻 <input id="cfgModelLight" class="input" /></label>
+        <label>标准 <input id="cfgModelStandard" class="input" /></label>
+        <label>严格 <input id="cfgModelStrict" class="input" /></label>
+        <label>极致 <input id="cfgModelMax" class="input" /></label>
+      </div>
+    </div>
+    <label class="field">
+      <span>单块字数（越大越省调用、但定位越粗）</span>
+      <input id="cfgChunk" class="input" type="number" min="800" max="8000" step="200" />
+    </label>
+    <label class="field">
+      <span>输出上限 max_tokens（0 = 不传，用服务端默认；推理模型建议 ≥ 32768）</span>
+      <input id="cfgMaxTokens" class="input" type="number" min="0" max="131072" step="1024" />
+    </label>
+    <label class="field">
+      <span>导出正文字体</span>
+      <select id="cfgFont" class="input">
+        <option value="">跟随原稿</option>
+        <option value="宋体">统一为宋体</option>
+        <option value="仿宋">统一为仿宋</option>
+        <option value="楷体">统一为楷体</option>
+        <option value="微软雅黑">统一为微软雅黑</option>
+      </select>
+    </label>
+    <div class="field">
+      <span>单价（人民币 / 每百万 token，用来估算与结算费用）</span>
+      <div class="models">
+        <label>输入单价 <input id="cfgPriceIn" class="input" type="number" min="0" step="0.1" /></label>
+        <label>输出单价 <input id="cfgPriceOut" class="input" type="number" min="0" step="0.1" /></label>
+      </div>
+    </div>
+    <label class="check">
+      <input id="cfgMock" type="checkbox" />
+      <span>离线演示模式（不调用 API，只用本地规则预检）</span>
+    </label>
+    <div class="drawer-actions">
+      <button id="btnTest" class="btn btn-ghost">测试连接</button>
+      <button id="btnSaveCfg" class="btn btn-primary">保存</button>
+    </div>
+    <p id="testResult" class="hint"></p>
+    <p class="hint">Key 只保存在本机 config.json，不会发往除你所填 API 之外的地方。</p>
+    <div class="panel-head staff-head"><h2>制作人员</h2></div>
+    <div id="staffList" class="staff-list"></div>
+  </div>
+</aside>
+
+<!-- ============ 规则库 ============ -->
+<aside id="rulesDrawer" class="drawer is-hidden">
+  <div class="drawer-head">
+    <h2>规则库</h2>
+    <button id="btnCloseRules" class="btn btn-ghost">关闭</button>
+  </div>
+  <div class="drawer-body">
+    <p class="hint">关闭的规则不会发送给模型；自定义规则会追加到对应环节的 system prompt。</p>
+    <div id="rulesList" class="rules-list"></div>
+    <div class="panel-head"><h2>追加自定义规则</h2></div>
+    <label class="field">
+      <span>标题</span>
+      <input id="ruleTitle" class="input" placeholder="例如：禁用第一人称" />
+    </label>
+    <label class="field">
+      <span>正文</span>
+      <textarea id="ruleBody" class="input" placeholder="写成给模型的规则说明"></textarea>
+    </label>
+    <label class="field">
+      <span>环节归属</span>
+      <select id="ruleStage" class="input">
+        <option value="zero">零审</option>
+        <option value="first">一审</option>
+        <option value="second" selected>二审</option>
+      </select>
+    </label>
+    <div class="drawer-actions">
+      <button id="btnAddRule" class="btn btn-primary">追加</button>
+    </div>
+    <p id="rulesMsg" class="hint"></p>
+  </div>
+</aside>
+
+<!-- ============ 管理员 ============ -->
+<aside id="adminDrawer" class="drawer is-hidden">
+  <div class="drawer-head">
+    <h2>管理员</h2>
+    <button id="btnCloseAdmin" class="btn btn-ghost">关闭</button>
+  </div>
+  <div class="drawer-body">
+    <div id="adminLogin">
+      <label class="field">
+        <span>管理员密码</span>
+        <input id="adminPwd" class="input" type="password" placeholder="输入密码" />
+      </label>
+      <div class="drawer-actions">
+        <button id="btnAdminLogin" class="btn btn-primary">进入</button>
+      </div>
+      <p id="adminLoginMsg" class="hint"></p>
+      <p class="hint">默认密码 cdqzzy1103；密码只保存哈希，可在面板里修改。</p>
+    </div>
+    <div id="adminPanel" class="is-hidden">
+      <label class="field">
+        <span>公告（普通界面顶部显示，留空则不显示）</span>
+        <textarea id="adminNotice" class="input"></textarea>
+      </label>
+      <label class="field">
+        <span>版本号（显示在顶栏，默认读 APP_VERSION）</span>
+        <input id="adminVersion" class="input" />
+      </label>
+      <div class="field">
+        <span>制作人员</span>
+        <div id="staffRows" class="staff-rows"></div>
+        <button id="btnAddStaff" class="btn btn-mini">添加成员</button>
+      </div>
+      <label class="field">
+        <span>默认 API Base URL</span>
+        <input id="adminBase" class="input" />
+      </label>
+      <div class="field">
+        <span>默认模型</span>
+        <div class="models">
+          <label>轻 <input id="adminModelLight" class="input" /></label>
+          <label>标准 <input id="adminModelStandard" class="input" /></label>
+          <label>严格 <input id="adminModelStrict" class="input" /></label>
+          <label>极致 <input id="adminModelMax" class="input" /></label>
+        </div>
+      </div>
+      <label class="field">
+        <span>默认 API Key（可选）</span>
+        <input id="adminKey" class="input" type="password" placeholder="留空则沿用已保存的 Key" />
+      </label>
+      <label class="check">
+        <input id="adminSendKey" type="checkbox" />
+        <span>保存时同时下发 Key 到当前配置</span>
+      </label>
+      <div class="drawer-actions">
+        <button id="btnAdminSave" class="btn btn-primary">保存</button>
+      </div>
+      <label class="field">
+        <span>修改密码（至少 4 位）</span>
+        <input id="adminNewPwd" class="input" type="password" />
+      </label>
+      <div class="drawer-actions">
+        <button id="btnAdminPwd" class="btn btn-ghost">改密码</button>
+      </div>
+      <p id="adminMsg" class="hint"></p>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ AI 实时输出 ============ -->
+<aside id="aiPanel" class="ai-panel is-hidden">
+  <div class="ai-head">
+    <span>AI 实时输出</span>
+    <button id="btnAiClose" class="btn btn-mini">收起</button>
+  </div>
+  <pre id="aiOut" class="ai-out"></pre>
+</aside>
+
+<div id="toast" class="toast is-hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

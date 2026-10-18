@@ -1,0 +1,17 @@
+# 运行数据与本地配置
+config.json
+data/
+desktop.log
+tests/ui/
+tests/*.log
+tests/*.err
+tests/sample*.docx
+tests/*_reviewed.docx
+tests/*_pipeline.docx
+tests/_tmp_cfg/
+__pycache__/
+*.pyc
+.DS_Store
+build/
+dist/
+*.spec.bak
