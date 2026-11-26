@@ -14,14 +14,31 @@ from . import APP_VERSION, paths
 
 MODEL_KEYS = ("light", "standard", "strict", "max")
 
+
+def _new_random_password() -> str:
+    """首次运行生成随机初始口令（12 位，去掉易混字符）。"""
+    alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alphabet) for _ in range(12))
+
+
 def _seed_from_resource(target: pathlib.Path) -> bool:
-    """打包运行时把内置的盐/哈希复制到可写目录，之后改密写在副本上。"""
+    """首次运行没有密码文件时生成一份（随机口令，打印到控制台提示用户改掉）。
+
+    绝不使用固定默认口令——仓库是公开的。
+    """
     try:
-        src = paths.resource("app", "admin_secret.py")
-        if not src.exists() or src.resolve() == target.resolve():
+        p = pathlib.Path(target)
+        if p.exists():
             return False
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        p.parent.mkdir(parents=True, exist_ok=True)
+        pwd = _new_random_password()
+        from app.admin_secret import new_secret_file_text
+        p.write_text(new_secret_file_text(pwd), encoding="utf-8")
+        try:
+            print("[ReSTAgent] 已生成管理员初始密码：%s" % pwd, file=__import__("sys").stderr)
+            print("[ReSTAgent] 请登录「管理员」面板后立刻修改。", file=__import__("sys").stderr)
+        except Exception:
+            pass
         return True
     except Exception:  # noqa: BLE001
         return False
@@ -30,6 +47,11 @@ def _seed_from_resource(target: pathlib.Path) -> bool:
 if paths.is_frozen():
     # 打包后 _MEIPASS 只读：密码文件放在用户目录，首次运行时从包内种子复制
     SECRET_PATH = paths.user_dir() / "admin_secret.py"
+    if not SECRET_PATH.exists():
+        _seed_from_resource(SECRET_PATH)
+elif os.environ.get("RESTAGENT_SECRET_DIR"):
+    # 源码运行但密码文件放在仓库外（避免把密码哈希提交到公开仓库）
+    SECRET_PATH = pathlib.Path(os.environ["RESTAGENT_SECRET_DIR"]) / "admin_secret.py"
     if not SECRET_PATH.exists():
         _seed_from_resource(SECRET_PATH)
 else:
@@ -47,6 +69,9 @@ def load_secret(path: pathlib.Path | None = None) -> tuple[str, str]:
     会命中 __pycache__ 里的旧 .pyc，导致旧密码改完仍然有效。
     """
     p = pathlib.Path(path or SECRET_PATH)
+    if not p.exists() and p == SECRET_PATH:
+        # 首次运行（源码模式且仓库里没有密码文件）：从内置种子生成一份随机密码
+        _seed_from_resource(p)
     if not p.exists():
         raise ValueError("管理员密码文件缺失：%s" % p)
     try:

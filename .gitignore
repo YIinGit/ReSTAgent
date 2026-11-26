@@ -39,3 +39,6 @@ samples/字体.pdf
 samples/字体.idml
 samples/字体_三审报告.md
 
+admin_secret.py
+samples/字体*
+*.zip
