@@ -373,3 +373,93 @@ textarea.input{width:100%;min-height:70px;resize:vertical;line-height:1.7;font-f
   .topbar{flex-wrap:wrap;gap:8px}
   .topbar-right{flex-wrap:wrap}
 }
+
+/* ============ 三审（IDML + PDF） ============ */
+.third-box{
+  margin-top:14px;padding:14px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--panel-2);
+}
+.third-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.third-file{
+  display:flex;flex-direction:column;gap:6px;padding:14px;border:1px dashed var(--line-strong);
+  border-radius:var(--radius-sm);background:var(--panel);cursor:pointer;transition:border-color .15s;
+}
+.third-file:hover{border-color:var(--accent)}
+.third-tag{font-size:12px;color:var(--muted);letter-spacing:.4px}
+.third-name{
+  font-size:15px;font-weight:600;color:var(--ink);word-break:break-all;line-height:1.4;
+}
+.third-name.has-file{color:var(--accent)}
+.third-sub{font-size:12px;color:var(--muted)}
+.third-check{margin-top:12px}
+.third-box .hint{margin-top:8px;font-size:12px;color:var(--muted)}
+
+.third-results{display:flex;flex-direction:column;gap:14px}
+.third-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.third-toolbar-right{display:flex;align-items:center;gap:12px}
+.third-split{display:grid;grid-template-columns:minmax(320px,420px) 1fr;gap:16px;align-items:start}
+.third-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 250px);overflow:auto;padding-right:4px}
+.third-group{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.5px;margin:10px 0 2px}
+.tcard{
+  padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);
+  background:var(--panel);cursor:pointer;transition:border-color .15s,box-shadow .15s;
+}
+.tcard:hover{border-color:var(--line-strong)}
+.tcard.is-active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.tcard-top{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.tcard-badge{font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600}
+.tcard-badge.major{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-line)}
+.tcard-badge.minor{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+.tcard-badge.info{background:var(--panel-3);color:var(--muted);border:1px solid var(--line)}
+.tcard-page{margin-left:auto;font-size:12px;color:var(--muted)}
+.tcard-msg{margin-top:5px;font-size:13px;color:var(--ink-2);line-height:1.55}
+.tcard-std{margin-top:4px;font-size:12px;color:var(--muted)}
+
+.third-view{display:flex;flex-direction:column;gap:10px;min-width:0}
+.third-nav{display:flex;gap:6px;flex-wrap:wrap}
+.pnav{
+  min-width:30px;height:28px;padding:0 8px;border-radius:7px;border:1px solid var(--line);
+  background:var(--panel);font-size:12px;color:var(--ink-2);cursor:pointer;
+}
+.pnav:hover{border-color:var(--line-strong)}
+.pnav.is-active{background:var(--accent);border-color:var(--accent);color:#fff}
+.pnav.has-issue{border-color:var(--warn-line)}
+.third-page-wrap{
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--panel-3);
+  padding:14px;overflow:auto;max-height:calc(100vh - 300px);text-align:center;
+}
+.page-inner{position:relative;display:inline-block;line-height:0;box-shadow:var(--shadow)}
+.page-inner img{display:block;max-width:none;height:auto;image-rendering:auto}
+.pbox{
+  position:absolute;border:2px solid var(--danger);border-radius:2px;
+  background:rgba(180,35,24,.10);pointer-events:none;
+}
+.pbox.minor{border-color:var(--warn);background:rgba(181,71,8,.10)}
+.pbox.info{border-color:var(--accent);background:rgba(43,89,212,.08)}
+.pbox.is-active{box-shadow:0 0 0 3px rgba(43,89,212,.25);z-index:2}
+.third-empty{padding:40px 20px;text-align:center;color:var(--muted);font-size:13px}
+@media (max-width:1100px){
+  .third-split{grid-template-columns:1fr}
+  .third-list{max-height:none}
+}
+
+/* ============ 排版要求（三审规则库） ============ */
+.layout-rules{display:flex;flex-direction:column;gap:10px}
+.lay-fields{display:flex;flex-direction:column;gap:6px}
+.lay-row{display:grid;grid-template-columns:1fr 110px 34px;align-items:center;gap:8px;font-size:13px}
+.lay-row input{padding:5px 8px;font-size:13px}
+.lay-row em{font-style:normal;font-size:12px;color:var(--muted)}
+
+/* 三审页面查看：高清显示 + 缩放 + 高亮开关 */
+.third-hl{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-2);white-space:nowrap}
+.third-zoom{display:flex;align-items:center;gap:4px}
+.third-zoom .btn-mini{min-width:30px}
+.third-zoom-label{font-size:12px;color:var(--muted);min-width:64px;text-align:center}
+
+/* 红框更醒目 + 选中框呼吸动画（解决「找不到高亮」） */
+.pbox{border-width:2.5px}
+.pbox.is-active{animation:pbox-pulse 1.4s ease-in-out infinite;z-index:3}
+@keyframes pbox-pulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(43,89,212,.55)}
+  50%{box-shadow:0 0 0 8px rgba(43,89,212,.12)}
+}

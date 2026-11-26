@@ -9,6 +9,15 @@ import urllib.request
 
 CHAT_PATH = "/chat/completions"
 
+# 不少中转网关带 WAF，会按 UA 拦截 Python-urllib；用普通浏览器 UA 并补上常规头。
+_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+       "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+
+def _common_headers(req: urllib.request.Request) -> None:
+    req.add_header("User-Agent", _UA)
+    req.add_header("Accept-Language", "zh-CN,zh;q=0.9")
+
 
 class LLMError(Exception):
     pass
@@ -40,11 +49,16 @@ def normalize_base(url: str) -> str:
 
 
 class Client:
-    def __init__(self, cfg: dict):
-        api = cfg.get("api", {})
+    def __init__(self, cfg: dict, section: str = "api"):
+        """section="vision_api" 时读取独立配置；该段没填则回退到 api。"""
+        api = (cfg.get(section) or {}) if section else {}
+        if section != "api" and not (api.get("base_url") or api.get("api_key")):
+            api = cfg.get("api", {})
+        self.section = section
         self.base_url = normalize_base(api.get("base_url") or "")
         self.api_key = (api.get("api_key") or "").strip()
         self.timeout = int(api.get("timeout") or 240)
+        self.timeout_override = None
         self.max_retries = int(api.get("max_retries") or 2)
         self.usage = {"prompt_tokens": 0, "completion_tokens": 0, "calls": 0, "estimated": 0}
         self.stream_fallback = False
@@ -86,10 +100,11 @@ class Client:
             if cancel is not None and cancel.is_set():
                 raise LLMError("已取消")
             req = urllib.request.Request(url, data=body, method="POST")
+            _common_headers(req)
             req.add_header("Content-Type", "application/json")
             req.add_header("Authorization", "Bearer " + self.api_key)
             try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(req, timeout=(self.timeout_override or self.timeout)) as resp:
                     raw = resp.read().decode("utf-8", "replace")
                 data = json.loads(raw)
                 self._count(data)
@@ -158,13 +173,14 @@ class Client:
             payload["max_tokens"] = int(max_tokens)
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         req = urllib.request.Request(url, data=body, method="POST")
+        _common_headers(req)
         req.add_header("Content-Type", "application/json")
         req.add_header("Accept", "text/event-stream")
         req.add_header("Authorization", "Bearer " + self.api_key)
         parts: list[str] = []
         usage = None
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            with urllib.request.urlopen(req, timeout=(self.timeout_override or self.timeout)) as resp:
                 for raw in resp:
                     if cancel is not None and cancel.is_set():
                         raise LLMError("已取消")
@@ -237,6 +253,7 @@ class Client:
 
 def _get(url: str, key: str, timeout: int = 10) -> dict:
     req = urllib.request.Request(url, method="GET")
+    _common_headers(req)
     if key:
         req.add_header("Authorization", "Bearer " + key)
     try:

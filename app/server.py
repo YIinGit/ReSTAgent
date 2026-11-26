@@ -26,6 +26,8 @@ if __package__ in (None, ""):
     from app import jobs as jobs_mod  # noqa: E402
     from app import paths  # noqa: E402
     from app import rules_lib  # noqa: E402
+    from app import third_jobs as third_mod  # noqa: E402
+    from app.layout import standard as layout_std  # noqa: E402
     from app.review import prompts  # noqa: E402
     from app.review.llm import Client, LLMError  # noqa: E402
     from app.review.pipeline import estimate  # noqa: E402
@@ -36,6 +38,8 @@ else:
     from . import jobs as jobs_mod  # noqa: E402
     from . import paths  # noqa: E402
     from . import rules_lib  # noqa: E402
+    from . import third_jobs as third_mod  # noqa: E402
+    from .layout import standard as layout_std  # noqa: E402
     from .review import prompts  # noqa: E402
     from .review.llm import Client, LLMError  # noqa: E402
     from .review.pipeline import estimate  # noqa: E402
@@ -43,7 +47,7 @@ else:
 WEB = paths.resource("web")
 
 MANAGER = jobs_mod.Manager()
-MAX_UPLOAD = 40 * 1024 * 1024
+MAX_UPLOAD = 320 * 1024 * 1024   # 三审的 PDF 常超过 50MB
 LOG_REQUESTS = False
 HITS = {"n": 0}   # 首页被请求的次数，桌面启动器用它判断窗口是否真的起来了
 ADMIN_TOKENS: set[str] = set()   # 管理员登录后颁发的一次性令牌（重启即失效）
@@ -145,10 +149,28 @@ class Handler(BaseHTTPRequestHandler):
                     return self._error("历史记录不存在", 404)
             if path == "/api/rules":
                 return self._json(self._rules_payload(config_mod.load()))
+            if path == "/api/layout/rules":
+                return self._json(self._layout_rules_payload())
             if path == "/api/download":
                 q = urllib.parse.parse_qs(parsed.query)
                 p = (q.get("path") or [""])[0]
                 return self._download(p)
+            if path.startswith("/api/third/"):
+                parts = path.strip("/").split("/")
+                jid = parts[2] if len(parts) > 2 else ""
+                try:
+                    tjob = third_mod.THIRD.get(jid)
+                except KeyError:
+                    return self._error("三审任务不存在或已过期", 404)
+                if len(parts) > 3 and parts[3] == "page":
+                    try:
+                        n = int(parts[4]) if len(parts) > 4 else 0
+                    except ValueError:
+                        n = 0
+                    return self._third_page(tjob, n)
+                if len(parts) > 3 and parts[3] in ("report", "download"):
+                    return self._third_report(tjob)
+                return self._json(tjob.to_dict(full=True))
             if path.startswith("/api/jobs/"):
                 parts = path.strip("/").split("/")
                 jid = parts[2] if len(parts) > 2 else ""
@@ -169,6 +191,8 @@ class Handler(BaseHTTPRequestHandler):
             path = parsed.path
             if path == "/api/upload":
                 return self._upload()
+            if path == "/api/third":
+                return self._third_create(parsed)
             if path == "/api/demo":
                 sample = paths.resource("samples", "示例稿_待审.docx")
                 if not sample.exists():
@@ -193,6 +217,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(estimate(cfg, stage, level, chars))
             if path == "/api/rules/toggle":
                 return self._rules_toggle()
+            if path == "/api/layout/rules":
+                return self._layout_rules_save()
+            if path == "/api/layout/rules/reset":
+                return self._json(self._layout_rules_payload(layout_std.reset()))
             if path == "/api/rules/custom":
                 return self._rules_custom()
             if path.startswith("/api/admin/"):
@@ -323,6 +351,26 @@ class Handler(BaseHTTPRequestHandler):
         payload["added"] = item
         return self._json(payload)
 
+    # ---------- 《排版要求》规则库（三审） ----------
+    def _layout_rules_payload(self, data: dict | None = None) -> dict:
+        cur = data if data is not None else layout_std.load()
+        return {
+            "rules": cur,
+            "defaults": layout_std.DEFAULTS,
+            "labels": layout_std.LABELS,
+            "units": layout_std.UNITS,
+            "rule_labels": layout_std.RULE_LABELS,
+            "path": str(layout_std.RULES_PATH),
+        }
+
+    def _layout_rules_save(self):
+        body = self._json_body()
+        patch = body.get("rules") if isinstance(body.get("rules"), dict) else body
+        if not isinstance(patch, dict) or not patch:
+            raise ValueError("没有收到要保存的排版要求")
+        saved = layout_std.save(patch)
+        return self._json(self._layout_rules_payload(saved))
+
     # ---------- 管理员 ----------
     def _admin_ok(self) -> bool:
         token = self.headers.get("X-Admin-Token") or ""
@@ -438,6 +486,67 @@ class Handler(BaseHTTPRequestHandler):
                                       urllib.parse.quote(p.name)}
         self._send(200, p.read_bytes(), ctype, extra)
 
+    # ---------- 三审（IDML + PDF 版式检查） ----------
+    def _multipart(self):
+        """解析 multipart 请求，返回 [(filename, bytes)]；失败抛 ValueError。"""
+        ctype = self.headers.get("Content-Type") or ""
+        if "multipart/form-data" not in ctype:
+            raise ValueError("请用 multipart/form-data 上传")
+        boundary = None
+        for seg in ctype.split(";"):
+            seg = seg.strip()
+            if seg.startswith("boundary="):
+                boundary = seg[len("boundary="):].strip('"').encode()
+        if not boundary:
+            raise ValueError("缺少 boundary")
+        return parse_multipart(self._body(), boundary)
+
+    def _third_create(self, parsed):
+        files = self._multipart()
+        idml = b""
+        idml_name = ""
+        pdf = b""
+        pdf_name = ""
+        for name, blob in files:
+            low = name.lower()
+            if low.endswith(".idml") and not idml:
+                idml, idml_name = blob, name
+            elif low.endswith(".pdf") and not pdf:
+                pdf, pdf_name = blob, name
+        if not idml and not pdf:
+            return self._error("请选择 IDML 或 PDF 文件（IDML：InDesign → 文件 → 导出 → InDesign 标记语言）")
+        q = urllib.parse.parse_qs(parsed.query)
+        vision = (q.get("vision") or ["1"])[0] not in ("0", "false", "no")
+        try:
+            per_sheet = int((q.get("per_sheet") or ["2"])[0] or 2)
+        except ValueError:
+            per_sheet = 2
+        try:
+            scale = float((q.get("scale") or ["2.2"])[0] or 2.2)
+        except ValueError:
+            scale = 2.2
+        scale = max(1.0, min(4.0, scale))     # 1.0=72dpi，2.2≈158dpi，4.0≈288dpi
+        try:
+            tjob = third_mod.THIRD.create(idml, idml_name, pdf, pdf_name,
+                                          config_mod.load(), vision, per_sheet, scale=scale)
+        except ValueError as e:
+            return self._error(e, 400)
+        return self._json(tjob.to_dict())
+
+    def _third_page(self, tjob, n: int):
+        p = tjob.dir / "pages" / ("page-%03d.png" % n)
+        if not p.exists():
+            return self._error("页面图不存在", 404)
+        return self._send(200, p.read_bytes(), "image/png")
+
+    def _third_report(self, tjob):
+        p = tjob.dir / "三审报告.md"
+        if not p.exists():
+            return self._error("报告尚未生成", 404)
+        extra = {"Content-Disposition": "attachment; filename*=UTF-8''%s" %
+                                      urllib.parse.quote(p.name)}
+        return self._send(200, p.read_bytes(), "text/markdown; charset=utf-8", extra)
+
     def _upload(self):
         ctype = self.headers.get("Content-Type") or ""
         if "multipart/form-data" not in ctype:
@@ -463,6 +572,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _check(self):
         cfg = config_mod.load()
+        try:
+            body = self._json_body()
+        except Exception:  # noqa: BLE001
+            body = {}
+        if isinstance(body, dict) and body.get("vision"):
+            return self._check_vision(cfg)
         model = config_mod.model_for(cfg, "standard")
         try:
             from app.review.llm import probe
@@ -470,6 +585,34 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             return self._json({"ok": False, "error": str(e), "hint": "测试过程本身出错：%s" % e})
         return self._json(res)
+
+    def _check_vision(self, cfg: dict):
+        """测试视觉模型：发一张 1×1 图片，验证能否读图（三审角色判定依赖它）。"""
+        import base64
+        import time as _t
+        from app.layout import vision as vision_mod
+        client, model = vision_mod._client(cfg)
+        model = model or config_mod.model_for(cfg, "standard")
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+        url = "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+        msgs = [{"role": "user", "content": [
+            {"type": "text", "text": "这张图片是什么颜色？只回答一个词。"},
+            {"type": "image_url", "image_url": {"url": url}},
+        ]}]
+        t0 = _t.time()
+        try:
+            reply = client.chat(msgs, model=model, temperature=0.0, max_tokens=0)
+            return self._json({
+                "ok": True, "vision": True, "model": model, "base": client.base_url,
+                "ms": int((_t.time() - t0) * 1000), "reply": (reply or "").strip()[:40],
+            })
+        except Exception as e:  # noqa: BLE001
+            return self._json({
+                "ok": False, "vision": True, "model": model, "base": client.base_url,
+                "ms": int((_t.time() - t0) * 1000), "error": str(e)[:400],
+                "hint": "视觉模型需要支持 OpenAI 的 image_url 多模态输入；不支持就关掉三审的视觉开关。",
+            })
 
 
 def pick_port(preferred: int) -> int:

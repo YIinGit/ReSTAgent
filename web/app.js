@@ -145,6 +145,14 @@ function fillSettings() {
   $("#cfgModelStandard").value = m.standard || "";
   $("#cfgModelStrict").value = m.strict || "";
   $("#cfgModelMax").value = m.max || "";
+  const v = c.vision_api || {};
+  if ($("#cfgVisionBase")) {
+    $("#cfgVisionBase").value = v.base_url || "";
+    $("#cfgVisionKey").value = "";
+    $("#visionKeyHint").textContent = v.api_key_set ? "已保存：" + (v.api_key_hint || "") : "（沿用主 Key）";
+    $("#cfgVisionModel").value = v.model || "";
+    $("#cfgVisionPerSheet").value = v.per_sheet || 2;
+  }
   $("#cfgChunk").value = ((c.review || {}).chunk_chars) || 2800;
   $("#cfgFont").value = ((c.export || {}).font) || "";
   $("#cfgMock").checked = !!(c.debug && c.debug.mock);
@@ -700,6 +708,11 @@ async function saveSettings() {
       max: $("#cfgModelMax").value.trim(),
     },
     review: { chunk_chars: parseInt($("#cfgChunk").value, 10) || 2800 },
+    vision_api: {
+      base_url: ($("#cfgVisionBase") || {}).value ? $("#cfgVisionBase").value.trim() : "",
+      model: ($("#cfgVisionModel") || {}).value ? $("#cfgVisionModel").value.trim() : "",
+      per_sheet: parseInt(($("#cfgVisionPerSheet") || {}).value, 10) || 2,
+    },
     export: { font: $("#cfgFont").value },
     pricing: {
       input_per_m: parseFloat($("#cfgPriceIn").value) || 0,
@@ -709,6 +722,8 @@ async function saveSettings() {
   };
   const key = $("#cfgKey").value.trim();
   if (key) patch.api.api_key = key;
+  const vkey = ($("#cfgVisionKey") || {}).value ? $("#cfgVisionKey").value.trim() : "";
+  if (vkey) patch.vision_api.api_key = vkey;
   try {
     state.cfg = await api("/api/config", { method: "POST", body: patch });
     renderApiState();
@@ -744,6 +759,29 @@ async function testConnection() {
   } catch (e) {
     box.className = "hint test-result bad";
     box.textContent = "失败：" + e.message;
+  }
+}
+
+async function testVision() {
+  const box = $("#visionTestMsg");
+  if (box) { box.className = "hint"; box.textContent = "测试中…（会真实发一张图给视觉模型）"; }
+  try {
+    const r = await api("/api/check", { method: "POST", body: { vision: true } });
+    if (r.ok) {
+      if (box) {
+        box.className = "hint test-result ok";
+        box.innerHTML = `视觉模型可用：${esc(r.model)} · ${r.ms}ms · 回复「${esc(r.reply || "")}」`;
+      }
+      return;
+    }
+    if (box) {
+      box.className = "hint test-result bad";
+      box.innerHTML = `<b>不可用</b>：${esc(r.error || r.hint || "未知原因")}` +
+        (r.model ? `<br>模型：<code>${esc(r.model)}</code>` : "") +
+        (r.base ? `<br>Base：<code>${esc(r.base)}</code>` : "");
+    }
+  } catch (e) {
+    if (box) { box.className = "hint test-result bad"; box.textContent = "失败：" + e.message; }
   }
 }
 
@@ -1064,6 +1102,7 @@ function bind() {
   $("#drawerMask").addEventListener("click", closeAllDrawers);
   $("#btnSaveCfg").addEventListener("click", saveSettings);
   $("#btnTest").addEventListener("click", testConnection);
+  if ($("#btnTestVision")) $("#btnTestVision").addEventListener("click", testVision);
 
   $("#btnRules").addEventListener("click", openRules);
   $("#btnCloseRules").addEventListener("click", closeAllDrawers);

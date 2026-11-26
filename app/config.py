@@ -28,6 +28,16 @@ DEFAULTS = {
         "standard": "deepseek-chat",
         "strict": "deepseek-reasoner",
         "max": "deepseek-reasoner",
+        "vision": "",               # 三审视觉判定用的模型；留空 = 用 standard
+    },
+    # 视觉模型可以单独走一套 API（很多视觉模型与文本模型不在同一服务商/Key）
+    # base_url / api_key 留空则沿用上面 api 的设置。
+    "vision_api": {
+        "base_url": "",
+        "api_key": "",
+        "model": "",
+        "timeout": 900,
+        "per_sheet": 2,             # 一张拼版放几页（2 = 每 2 页一次视觉调用）
     },
     # 力度 -> 审稿强度（轮次由 pipeline 解释）
     "levels": {
@@ -96,10 +106,14 @@ def save(patch: dict) -> dict:
 def masked(cfg: dict) -> dict:
     """返回给前端的配置副本：隐藏 key 明文与管理员密码哈希。"""
     out = copy.deepcopy(cfg)
-    key = out.get("api", {}).get("api_key") or ""
-    out["api"]["api_key_set"] = bool(key)
-    out["api"]["api_key_hint"] = (key[:4] + "…" + key[-4:]) if len(key) > 8 else ("****" if key else "")
-    out["api"]["api_key"] = ""
+    for section in ("api", "vision_api"):
+        sec = out.get(section)
+        if not isinstance(sec, dict):
+            continue
+        key = sec.get("api_key") or ""
+        sec["api_key_set"] = bool(key)
+        sec["api_key_hint"] = (key[:4] + "…" + key[-4:]) if len(key) > 8 else ("****" if key else "")
+        sec["api_key"] = ""
     out["admin"] = mask_admin(out.get("admin") or {})
     return out
 

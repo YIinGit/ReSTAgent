@@ -58,6 +58,29 @@
             <button id="btnDemo" class="btn btn-mini">用示例稿件试一次</button>
             <span class="hint">示例稿内含直引号、的/地误用、半角标点等典型错误</span>
           </div>
+
+          <!-- 三审专用：IDML + PDF -->
+          <div id="thirdBox" class="third-box is-hidden">
+            <div class="third-grid">
+              <label class="third-file">
+                <span class="third-tag">①IDML · 结构</span>
+                <input id="idmlInput" type="file" accept=".idml" hidden />
+                <div id="idmlName" class="third-name">点击选择 .idml</div>
+                <span class="third-sub">页面尺寸 / 版面网格 / 文本框</span>
+              </label>
+              <label class="third-file">
+                <span class="third-tag">②PDF · 成品</span>
+                <input id="pdfInput" type="file" accept=".pdf" hidden />
+                <div id="pdfName" class="third-name">点击选择 .pdf</div>
+                <span class="third-sub">实际字体 / 字号 / 位置 / 越界</span>
+              </label>
+            </div>
+            <label class="check third-check">
+              <input id="thirdVision" type="checkbox" checked />
+              <span>先用视觉模型判定文字角色（更准；2 页拼一张，约 1 分钟）</span>
+            </label>
+            <p class="hint">InDesign 导出：文件 → 导出 → InDesign 标记语言(.idml)；同一文档再导出 PDF（勾选出血）。</p>
+          </div>
           <div id="fileList" class="file-list"></div>
         </div>
 
@@ -77,9 +100,9 @@
                 <span class="stage-name">二审</span>
                 <span class="stage-desc">文字与语法：病句、错别字、用词、标点、中西混排</span>
               </button>
-              <button class="stage is-disabled" disabled>
+              <button class="stage" data-stage="third">
                 <span class="stage-name">三审</span>
-                <span class="stage-desc">排版后检查（需 PDF 版式，暂未开放）</span>
+                <span class="stage-desc">排版终审：导入 IDML + PDF，查网格、字体字号、越界与混排</span>
               </button>
             </div>
           </div>
@@ -146,6 +169,31 @@
         </div>
         <div id="exportBanner" class="banner is-hidden"></div>
 
+        <!-- 三审结果：左问题清单 / 右页面图（红框） -->
+        <div id="thirdResults" class="third-results is-hidden">
+          <div class="third-toolbar">
+            <div id="thirdCounts" class="counts"></div>
+            <div class="third-toolbar-right">
+              <label class="third-hl"><input id="thirdHl" type="checkbox" checked /> 显示红框</label>
+              <div class="third-zoom">
+                <button class="btn btn-mini" id="thirdZoomOut" title="缩小">−</button>
+                <span id="thirdZoomLabel" class="third-zoom-label">适宽</span>
+                <button class="btn btn-mini" id="thirdZoomIn" title="放大">＋</button>
+                <button class="btn btn-mini" id="thirdFit" title="缩放到适合宽度">适宽</button>
+              </div>
+              <span id="thirdVisionInfo" class="hint"></span>
+              <a id="btnThirdReport" class="btn btn-primary" href="#" download>导出报告</a>
+            </div>
+          </div>
+          <div class="third-split">
+            <aside class="third-list" id="thirdList"></aside>
+            <section class="third-view">
+              <div class="third-nav" id="thirdNav"></div>
+              <div class="third-page-wrap" id="thirdPageWrap"></div>
+            </section>
+          </div>
+        </div>
+
         <div class="workbench">
           <aside class="side">
             <div class="filters">
@@ -202,6 +250,22 @@
         <label>极致 <input id="cfgModelMax" class="input" /></label>
       </div>
     </div>
+    <div class="field">
+      <span>视觉模型（三审角色判定，可单独配置；Base/Key 留空则沿用上面的 API）</span>
+      <div class="models">
+        <label>Base URL <input id="cfgVisionBase" class="input" placeholder="留空沿用主 API" /></label>
+        <label>Key <em id="visionKeyHint" class="muted"></em>
+          <input id="cfgVisionKey" class="input" type="password" placeholder="留空沿用主 Key" /></label>
+      </div>
+      <div class="models">
+        <label>模型 <input id="cfgVisionModel" class="input" placeholder="留空 = 用标准模型" /></label>
+        <label>每张拼版页数 <input id="cfgVisionPerSheet" class="input" type="number" min="1" max="4" step="1" /></label>
+      </div>
+      <p class="hint" id="visionTestMsg"></p>
+      <div class="drawer-actions">
+        <button id="btnTestVision" class="btn btn-ghost btn-mini">测试视觉模型</button>
+      </div>
+    </div>
     <label class="field">
       <span>单块字数（越大越省调用、但定位越粗）</span>
       <input id="cfgChunk" class="input" type="number" min="800" max="8000" step="200" />
@@ -251,6 +315,15 @@
   <div class="drawer-body">
     <p class="hint">关闭的规则不会发送给模型；自定义规则会追加到对应环节的 system prompt。</p>
     <div id="rulesList" class="rules-list"></div>
+
+    <div class="panel-head staff-head"><h2>排版要求（三审）</h2></div>
+    <p class="hint">三审对照的标准：页面、网格、各角色字号、容差与规则开关。改完保存，下次三审生效。</p>
+    <div id="layoutRules" class="layout-rules"></div>
+    <div class="drawer-actions">
+      <button id="btnLayoutReset" class="btn btn-ghost">恢复默认</button>
+      <button id="btnLayoutSave" class="btn btn-primary">保存排版要求</button>
+    </div>
+    <p id="layoutMsg" class="hint"></p>
     <div class="panel-head"><h2>追加自定义规则</h2></div>
     <label class="field">
       <span>标题</span>
@@ -354,5 +427,7 @@
 
 <div id="toast" class="toast is-hidden"></div>
 <script src="/static/app.js"></script>
+<script src="/static/third.js"></script>
+<script src="/static/layout_rules.js"></script>
 </body>
 </html>

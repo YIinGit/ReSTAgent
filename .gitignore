@@ -1,6 +1,8 @@
 # 运行数据与本地配置
 config.json
 data/
+third/
+layout_rules.json
 desktop.log
 tests/ui/
 tests/*.log
@@ -17,3 +19,23 @@ dist/
 *.spec.bak
 
 _package/
+
+# 打包产物与临时目录（体积大、可重新生成，不发仓库）
+_package.zip
+ReSTAgent_v*.zip
+ReSTAgent（预装api）.zip
+.tmp/
+_build/
+.venv-pack/
+dabao/
+ReSTAgent/
+
+# 内部计划文档不上传
+PLAN_*.md
+
+# 样张是真实杂志稿件，体积大（近 60MB），不进仓库
+samples/字体.indd
+samples/字体.pdf
+samples/字体.idml
+samples/字体_三审报告.md
+
