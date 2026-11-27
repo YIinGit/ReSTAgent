@@ -93,9 +93,14 @@ async function loadConfig() {
     renderApiState();
     fillSettings();
   } catch (e) {
-    toast("读取配置失败：" + e.message, true);
+    // 401 多半是没带访问令牌：不要中断后续初始化，给出可操作提示
+    if (/401|令牌/.test(e.message)) {
+      toast("没有访问权限：请用桌面启动器打开，或带上 ?t=令牌", true);
+    } else {
+      toast("读取配置失败：" + e.message, true);
+    }
   }
-  await loadHealth();
+  try { await loadHealth(); } catch (e) { /* 健康检查失败不影响使用 */ }
 }
 
 async function loadHealth() {
@@ -172,6 +177,44 @@ function fillSettings() {
   $("#cfgPriceOut").value = price.output_per_m === undefined ? 30 : price.output_per_m;
 }
 
+
+/* ---------------- 最近记录（顶栏下拉） ---------------- */
+const STAGE_DESC = {
+  zero: "录用把关：属性、立论、内容密度、难度、体例",
+  first: "内容与结构：学术错误、逻辑、文风、结构标注",
+  second: "文字与语法：病句、错别字、用词、标点、中西混排",
+  third: "排版终审：导入 IDML + PDF，查网格、字体字号、越界与混排",
+  campaign: "活动策划案初审：依据《2026活动部教案》查板块、目标、流程与风险",
+};
+const STAGE_LABEL_CN = { zero: "零审", first: "一审", second: "二审", third: "三审", campaign: "策审" };
+
+function bindRecent() {
+  const btn = $("#btnRecent");
+  if (!btn) return;
+  setText("#stageDetail", STAGE_DESC[state.stage] || STAGE_DESC.second);
+}
+
+function renderRecent() {
+  const pop = $("#recentPop");
+  if (!pop) return;
+  const items = state.history || [];
+  if (!items.length) {
+    pop.innerHTML = '<div class="recent-item"><span class="recent-name">还没有记录</span></div>';
+    return;
+  }
+  pop.innerHTML = items.slice(0, 20).map((h) => `
+    <div class="recent-item" data-hist="${esc(h.id)}">
+      <span class="recent-name">${esc(h.file_name || h.name || "（未命名）")}</span>
+      <span class="recent-meta">${esc(STAGE_LABEL_CN[h.stage] || h.stage || "")} · ${esc((h.updated || h.created || "").slice(5, 16))}</span>
+    </div>`).join("");
+  pop.querySelectorAll("[data-hist]").forEach((el) => {
+    el.addEventListener("click", () => {
+      pop.classList.add("is-hidden");
+      openHistory(el.dataset.hist);
+    });
+  });
+}
+
 /* ---------------- 选稿 ---------------- */
 function renderFiles() {
   const box = $("#fileList");
@@ -217,14 +260,18 @@ async function uploadFiles(fileList) {
 async function updateEstimate() {
   const ok = state.files.filter((f) => !f.error);
   const chars = ok.reduce((a, f) => a + f.chars, 0);
-  if (!chars) { $("#estimate").textContent = "选择稿件后显示预估"; return; }
+  if (!chars) {
+    ["#estCalls", "#estIn", "#estOut", "#estCost"].forEach((k) => setText(k, "—"));
+    return;
+  }
   try {
     const r = await api("/api/estimate", { method: "POST", body: { stage: state.stage, level: state.level, chars } });
-    $("#estimate").textContent =
-      `预计 ${r.calls} 轮调用 · 输入约 ${(r.in_tokens / 1000).toFixed(1)}k tokens · ` +
-      `输出上限约 ${(r.out_tokens / 1000).toFixed(1)}k · 费用约 ¥${Number(r.cost || 0).toFixed(4)}`;
+    setText("#estCalls", `${r.calls} 次`);
+    setText("#estIn", `${(r.in_tokens / 1000).toFixed(1)}k tokens`);
+    setText("#estOut", `${(r.out_tokens / 1000).toFixed(1)}k tokens`);
+    setText("#estCost", `¥${Number(r.cost || 0).toFixed(2)}`);
   } catch (e) {
-    $("#estimate").textContent = "预估失败";
+    setText("#estCalls", "预估失败");
   }
 }
 
@@ -412,6 +459,60 @@ function currentFindings() {
   );
 }
 
+
+/* ---------------- 稿件预览与安全区 ---------------- */
+function docParagraphs(fileId) {
+  const f = ((state.job || {}).files || []).find((x) => x.file_id === fileId);
+  return (f && f.paragraphs) || (f && f.result && f.result.paragraphs) || [];
+}
+
+function renderDoc() {
+  const box = $("#docBody");
+  if (!box) return;
+  const r = curResult();
+  if (!r) { box.innerHTML = '<p class="doc-empty">还没有结果。</p>'; return; }
+  const paras = r.paragraphs || docParagraphs(state.curFile);
+  if (!paras.length) {
+    box.innerHTML = '<p class="doc-empty">这份稿子的原文不在结果里，可用右侧详情查看上下文。</p>';
+    return;
+  }
+  const sel = (r.findings || []).find((x) => x.id === state.sel);
+  box.innerHTML = paras.map((p, i) => {
+    const t = esc(p.text || "");
+    if (!sel || !sel.pid || sel.pid !== p.pid) return `<p>${t || "&nbsp;"}</p>`;
+    // 命中段落：把定位区间用 mark 标出来
+    const a = Math.max(0, sel.start || 0), b = Math.min(t.length, sel.end || 0);
+    if (b <= a) return `<p class="is-target">${t || "&nbsp;"}</p>`;
+    return `<p class="is-target">${t.slice(0, a)}<mark class="doc-mark active">${
+      t.slice(a, b)}</mark>${t.slice(b)}</p>`;
+  }).join("");
+  const mark = box.querySelector(".doc-mark.active");
+  if (mark) {
+    const top = mark.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+    box.scrollTo({ top: Math.max(0, top - box.clientHeight / 2), behavior: "smooth" });
+  }
+}
+
+function renderRail() {
+  const dots = $("#railDots");
+  if (!dots) return;
+  const all = (curResult() || {}).findings || [];
+  const done = all.filter((f) => f.status !== "pending").length;
+  dots.innerHTML = all.map((f) => {
+    const cls = ["rail-dot"];
+    if (f.status !== "pending") cls.push("done");
+    if (f.severity === "must") cls.push("must");
+    if (f.id === state.sel) cls.push("active");
+    return `<button class="${cls.join(" ")}" data-rail="${esc(f.id)}" title="${esc(f.problem || "")}"></button>`;
+  }).join("");
+  setText("#railCount", all.length ? `${done}/${all.length} 已处理` : "—");
+}
+
+function setText(sel, text) {
+  const el = $(sel);
+  if (el) el.textContent = text;
+}
+
 function renderResults() {
   const r = curResult();
   if (!r) return;
@@ -420,6 +521,8 @@ function renderResults() {
   renderList();
   renderCounts();
   renderDetail();
+  renderDoc();
+  renderRail();
   renderUsage(state.job);
   $("#btnExport").disabled = false;
 }
@@ -553,7 +656,7 @@ function renderDetail() {
   if (!f) { box.innerHTML = `<div class="empty">选择左侧一条意见查看详情</div>`; return; }
   box.innerHTML = detailHTML(f);
   const ta = $("#editAfter");
-  if (ta) ta.focus({ preventScroll: true });
+  // 不抢焦点：按 A/X 要能连续处理下一条（原为 ta.focus）
 }
 
 /* ---------------- 决定 ---------------- */
@@ -636,6 +739,7 @@ async function loadHistory() {
   try {
     const r = await api("/api/history");
     state.history = r.items || [];
+    if (window.renderRecent) renderRecent();
     renderHistory();
   } catch (e) {
     console.warn("历史读取失败", e);
@@ -643,6 +747,7 @@ async function loadHistory() {
 }
 
 function renderHistory() {
+  if (!document.querySelector("#historyList")) return;
   const box = $("#historyList");
   if (!state.history.length) {
     box.innerHTML = `<div class="hint">暂无历史记录。完成一次审稿后会自动保存。</div>`;
@@ -983,6 +1088,9 @@ function bind() {
     if (!b) return;
     state.stage = b.dataset.stage;
     $$(".stage").forEach((x) => x.classList.toggle("is-active", x === b));
+    const desc = document.querySelector(`.stage[data-stage="${state.stage}"] .stage-desc`);
+    state.stageDesc = STAGE_DESC[state.stage] || "";
+    setText("#stageDetail", state.stageDesc || STAGE_DESC.second);
     updateEstimate();
   });
   $("#levelList").addEventListener("click", (e) => {
@@ -1024,7 +1132,7 @@ function bind() {
     const c = e.target.closest("[data-id]");
     if (!c) return;
     state.sel = c.dataset.id;
-    renderList(); renderDetail();
+    renderList(); renderDetail(); renderDoc(); renderRail();
   });
 
   $("#detail").addEventListener("click", async (e) => {
@@ -1070,13 +1178,13 @@ function bind() {
     catch (err) { toast("打开失败：" + err.message, true); }
   });
 
-  $("#historyList").addEventListener("click", (e) => {
+  document.querySelector("#historyList")?.addEventListener("click", (e) => {
     const del = e.target.closest("[data-hist-del]");
     if (del) { e.stopPropagation(); deleteHistory(del.dataset.histDel); return; }
     const item = e.target.closest("[data-hist]");
     if (item) openHistory(item.dataset.hist);
   });
-  $("#btnRefreshHistory").addEventListener("click", loadHistory);
+  document.querySelector("#btnRefreshHistory")?.addEventListener("click", loadHistory);
 
   $("#btnSettings").addEventListener("click", openDrawer);
   $("#btnCloseDrawer").addEventListener("click", closeDrawer);
@@ -1105,12 +1213,52 @@ function bind() {
   });
 
   document.addEventListener("keydown", async (e) => {
+    if (e.isComposing) return;                       // 中文输入法组字时不抢键
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
     if ($("#viewResults").classList.contains("is-hidden")) return;
+    const list = currentFindings();
     const f = (curResult()?.findings || []).find((x) => x.id === state.sel);
+    if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); return step(1); }
+    if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); return step(-1); }
+    if (e.key === "Escape") { closeAllDrawers(); $("#sideList")?.classList.remove("is-open"); return; }
     if (!f) return;
-    if (e.key === "a" || e.key === "A") { e.preventDefault(); try { await decide(f.id, "accepted"); } catch (err) { toast(err.message, true); } }
+    if (e.key === "a" || e.key === "A" || e.key === "Enter") { e.preventDefault(); try { await decide(f.id, "accepted"); } catch (err) { toast(err.message, true); } }
     if (e.key === "x" || e.key === "X") { e.preventDefault(); try { await decide(f.id, "rejected"); } catch (err) { toast(err.message, true); } }
+  });
+
+  // 上一条 / 下一条
+  window.step = function (dir) {
+    const list = currentFindings();
+    if (!list.length) return;
+    const i = list.findIndex((x) => x.id === state.sel);
+    const j = Math.max(0, Math.min(list.length - 1, (i < 0 ? 0 : i) + dir));
+    state.sel = list[j].id;
+    renderList(); renderDetail(); renderDoc(); renderRail();
+  };
+
+  // 安全区圆点
+  $("#railDots")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rail]");
+    if (!b) return;
+    state.sel = b.dataset.rail;
+    renderList(); renderDetail(); renderDoc(); renderRail();
+  });
+
+  // 清单浮层开关
+  $("#btnToggleSide")?.addEventListener("click", () => {
+    $("#sideList")?.classList.toggle("is-open");
+  });
+
+  // 最近记录下拉
+  $("#btnRecent")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const pop = $("#recentPop");
+    if (!pop) return;
+    pop.classList.toggle("is-hidden");
+    if (!pop.classList.contains("is-hidden")) renderRecent();
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".recent")) $("#recentPop")?.classList.add("is-hidden");
   });
 }
 
@@ -1122,7 +1270,9 @@ function bind() {
   $('.stage[data-stage="second"]').classList.add("is-active");
   $('.level[data-level="standard"]').classList.add("is-active");
   renderFiles();
+  renderRail();
   loadHistory();
+  bindRecent();
   loadConfig().then(() => {
     if (new URLSearchParams(location.search).get("demo") === "1") loadDemo();
   });

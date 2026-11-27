@@ -241,6 +241,12 @@ class Manager:
                         job.set_pct(_fe["file_id"], pct)
 
                 res = reviewer.review_file(doc, progress, job.cancel)
+                # 正文预览用：段落编号 + 纯文本（前端点意见时高亮定位）
+                try:
+                    res["paragraphs"] = [{"pid": para.pid, "text": para.text or ""}
+                                         for para in doc.paras if (para.text or "").strip()]
+                except Exception:  # noqa: BLE001
+                    res["paragraphs"] = []
                 fe["result"] = res
                 fe["status"] = "done" if not job.cancel.is_set() else "cancelled"
                 with job.lock:

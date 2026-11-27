@@ -6,7 +6,9 @@
 <title>ReSTAgent · AI 文稿审读</title>
 <script>try{var t=localStorage.getItem("restagent.theme");if(!t)t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <link rel="icon" href="/static/icon.png" />
+<link rel="stylesheet" href="/static/tokens.css" />
 <link rel="stylesheet" href="/static/style.css" />
+<link rel="stylesheet" href="/static/layout.css" />
 </head>
 <body>
 <header class="topbar">
@@ -14,131 +16,102 @@
     <div class="logo">R</div>
     <div>
       <h1>ReSTAgent <span id="appVersion" class="ver">v0.3</span></h1>
-      <p class="tagline">AI 文稿审读 · 依据《文稿培训资料 V2.5.0》</p>
+      <p class="tagline">本机运行 · 数据不外传</p>
     </div>
   </div>
   <div class="topbar-right">
     <span id="apiState" class="pill pill-muted">检测中…</span>
-    <button id="btnTheme" class="btn btn-ghost" title="切换浅色 / 深色">深色</button>
+    <div class="recent">
+      <button id="btnRecent" class="btn btn-ghost" title="最近审过的稿子">最近</button>
+      <div id="recentPop" class="recent-pop is-hidden"></div>
+    </div>
     <button id="btnRules" class="btn btn-ghost">规则库</button>
     <button id="btnAdmin" class="btn btn-ghost">管理员</button>
     <button id="btnSettings" class="btn btn-ghost">设置</button>
+    <button id="btnTheme" class="btn btn-ghost" title="切换浅色 / 深色">浅色</button>
   </div>
 </header>
 <div id="noticeBar" class="notice is-hidden"></div>
 
 <main>
-  <div class="layout">
-    <!-- ============ 历史 ============ -->
-    <aside class="hist-col">
-      <div class="panel hist-panel">
-        <div class="panel-head">
-          <h2>历史</h2>
-          <button id="btnRefreshHistory" class="btn btn-mini">刷新</button>
-        </div>
-        <div id="historyList" class="history-list"></div>
-      </div>
-    </aside>
-
-    <div class="main-col">
-      <!-- ============ 第一步：选稿与参数 ============ -->
+  <div class="main-col">
       <section id="viewSetup" class="view">
-        <div class="panel">
-          <div class="panel-head">
-            <h2>1 · 选择稿件</h2>
-            <span class="hint">支持一次选择多份 .docx</span>
-          </div>
-          <label id="drop" class="drop">
-            <input id="fileInput" type="file" accept=".docx" multiple hidden />
-            <div class="drop-icon">＋</div>
-            <div class="drop-main">把 Word 文件拖到这里，或点击选择</div>
-            <div class="drop-sub">审稿不会改动原文件，导出的是新文件</div>
-          </label>
-          <div class="demo-row">
-            <button id="btnDemo" class="btn btn-mini">用示例稿件试一次</button>
-            <span class="hint">示例稿内含直引号、的/地误用、半角标点等典型错误</span>
-          </div>
-
-          <!-- 三审专用：IDML + PDF -->
-          <div id="thirdBox" class="third-box is-hidden">
-            <div class="third-grid">
-              <label class="third-file">
-                <span class="third-tag">①IDML · 结构</span>
-                <input id="idmlInput" type="file" accept=".idml" hidden />
-                <div id="idmlName" class="third-name">点击选择 .idml</div>
-                <span class="third-sub">页面尺寸 / 版面网格 / 文本框</span>
-              </label>
-              <label class="third-file">
-                <span class="third-tag">②PDF · 成品</span>
-                <input id="pdfInput" type="file" accept=".pdf" hidden />
-                <div id="pdfName" class="third-name">点击选择 .pdf</div>
-                <span class="third-sub">实际字体 / 字号 / 位置 / 越界</span>
-              </label>
-            </div>
-            <label class="check third-check">
-              <input id="thirdVision" type="checkbox" checked />
-              <span>先用视觉模型判定文字角色（更准；2 页拼一张，约 1 分钟）</span>
+        <div class="setup-grid">
+          <!-- 左：放入稿件 -->
+          <div class="setup-col setup-drop">
+            <h2 class="step"><span class="step-no">01</span>放入稿件
+              <span class="step-sub">不改原文件 · 结果另存</span>
+            </h2>
+            <label id="drop" class="drop">
+              <input id="fileInput" type="file" accept=".docx" multiple hidden />
+              <div class="drop-icon">＋</div>
+              <div class="drop-main">拖入 Word 文件，或点击选择</div>
+              <div class="drop-sub">可一次选多份 .docx</div>
             </label>
-            <p class="hint">InDesign 导出：文件 → 导出 → InDesign 标记语言(.idml)；同一文档再导出 PDF（勾选出血）。</p>
-          </div>
-          <div id="fileList" class="file-list"></div>
-        </div>
-
-        <div class="grid-2">
-          <div class="panel">
-            <div class="panel-head"><h2>2 · 审稿环节</h2></div>
-            <div class="stage-list" id="stageList">
-              <button class="stage" data-stage="zero">
-                <span class="stage-name">零审</span>
-                <span class="stage-desc">录用把关：属性、立论、内容密度、难度、体例</span>
-              </button>
-              <button class="stage" data-stage="first">
-                <span class="stage-name">一审</span>
-                <span class="stage-desc">内容与结构：学术错误、逻辑、文风、结构标注</span>
-              </button>
-              <button class="stage" data-stage="second">
-                <span class="stage-name">二审</span>
-                <span class="stage-desc">文字与语法：病句、错别字、用词、标点、中西混排</span>
-              </button>
-              <button class="stage" data-stage="third">
-                <span class="stage-name">三审</span>
-                <span class="stage-desc">排版终审：导入 IDML + PDF，查网格、字体字号、越界与混排</span>
-              </button>
+            <div class="demo-row">
+              <button id="btnDemo" class="btn btn-mini">用示例稿试一次</button>
             </div>
-            <a class="stage stage-link" href="/campaign">
-              <span class="stage-name">策审</span>
-              <span class="stage-desc">活动策划案初审：依据《2026活动部教案》查板块、目标、流程与风险</span>
-            </a>
-            <p class="stage-note">策审是独立环节，用自己的一套标准，点击进入单独页面。</p>
+
+            <!-- 三审：IDML + PDF -->
+            <div id="thirdBox" class="third-box is-hidden">
+              <div class="third-grid">
+                <label class="third-file">
+                  <span class="third-tag">① IDML · 结构</span>
+                  <input id="idmlInput" type="file" accept=".idml" hidden />
+                  <div id="idmlName" class="third-name">点击选择 .idml</div>
+                  <span class="third-sub">页面 / 网格 / 文本框</span>
+                </label>
+                <label class="third-file">
+                  <span class="third-tag">② PDF · 成品</span>
+                  <input id="pdfInput" type="file" accept=".pdf" hidden />
+                  <div id="pdfName" class="third-name">点击选择 .pdf</div>
+                  <span class="third-sub">字体 / 字号 / 位置</span>
+                </label>
+              </div>
+              <label class="check third-check">
+                <input id="thirdVision" type="checkbox" checked />
+                <span>先用视觉模型判定文字角色（2 页拼一张，约 1 分钟）</span>
+              </label>
+              <p class="hint">InDesign：文件 → 导出 → InDesign 标记语言(.idml)，再导出 PDF（勾选出血）</p>
+            </div>
+            <div id="fileList" class="file-list"></div>
           </div>
 
-          <div class="panel">
-            <div class="panel-head"><h2>3 · 审稿力度</h2></div>
-            <div class="level-list" id="levelList">
-              <button class="level" data-level="light">
-                <span class="level-name">轻</span><span class="level-desc">单遍速览 · 只报必改</span>
-              </button>
-              <button class="level" data-level="standard">
-                <span class="level-name">标准</span><span class="level-desc">全规则单遍 · 日常使用</span>
-              </button>
-              <button class="level" data-level="strict">
-                <span class="level-name">严格</span><span class="level-desc">逐块审 + 复核轮</span>
-              </button>
-              <button class="level" data-level="max">
-                <span class="level-name">极致</span><span class="level-desc">多视角 + 交叉复核</span>
-              </button>
+          <!-- 右：怎么审 -->
+          <div class="setup-col setup-params">
+            <h2 class="step"><span class="step-no">02</span>怎么审</h2>
+            <div class="segmented" id="stageList" role="tablist">
+              <button class="stage" data-stage="zero">零审</button>
+              <button class="stage" data-stage="first">一审</button>
+              <button class="stage is-active" data-stage="second">二审</button>
+              <button class="stage" data-stage="third">三审</button>
+              <a class="stage stage-link" href="/campaign" title="依据《2026活动部教案》初审活动策划案">策审</a>
             </div>
-            <div class="est" id="estimate">选择稿件后显示预估</div>
+            <p class="stage-detail" id="stageDetail">文字与语法：病句、错别字、用词、标点、中西混排</p>
+
+            <div class="levels" id="levelList" role="radiogroup">
+              <button class="level" data-level="light">轻</button>
+              <button class="level is-active" data-level="standard">标准</button>
+              <button class="level" data-level="strict">严格</button>
+              <button class="level" data-level="max">极致</button>
+            </div>
+
+            <dl class="estimate-card" id="estimateCard">
+              <dt>预计调用</dt><dd id="estCalls">—</dd>
+              <dt>输入 tokens</dt><dd id="estIn">—</dd>
+              <dt>输出上限</dt><dd id="estOut">—</dd>
+              <dt>预计费用</dt><dd id="estCost" class="cost">—</dd>
+            </dl>
           </div>
         </div>
 
         <div class="startbar">
-          <div class="startbar-info" id="startInfo">请先选择稿件</div>
-          <button id="btnStart" class="btn btn-primary btn-lg" disabled>开始审稿</button>
+          <button id="btnStart" class="btn-start" disabled>开始审稿 →</button>
+          <p class="hint" id="startInfo">请先放入稿件</p>
         </div>
       </section>
 
-      <!-- ============ 第二步：审稿中 ============ -->
+      <!-- ============ 审稿中 ============ -->
       <section id="viewRunning" class="view is-hidden">
         <div class="panel running">
           <div class="running-head">
@@ -158,11 +131,12 @@
         </div>
       </section>
 
-      <!-- ============ 第三步：结果 ============ -->
+      <!-- ============ 结果 ============ -->
       <section id="viewResults" class="view is-hidden">
         <div class="resultbar">
           <div class="resultbar-left">
-            <button id="btnNew" class="btn btn-ghost">← 新建审稿</button>
+            <button id="btnNew" class="btn btn-ghost">← 新建</button>
+            <button id="btnToggleSide" class="btn btn-ghost" title="显示 / 隐藏意见清单">≡ 清单</button>
             <div class="tabs" id="fileTabs"></div>
           </div>
           <div class="resultbar-right">
@@ -174,7 +148,7 @@
         </div>
         <div id="exportBanner" class="banner is-hidden"></div>
 
-        <!-- 三审结果：左问题清单 / 右页面图（红框） -->
+        <!-- 三审结果 -->
         <div id="thirdResults" class="third-results is-hidden">
           <div class="third-toolbar">
             <div id="thirdCounts" class="counts"></div>
@@ -184,7 +158,7 @@
                 <button class="btn btn-mini" id="thirdZoomOut" title="缩小">−</button>
                 <span id="thirdZoomLabel" class="third-zoom-label">适宽</span>
                 <button class="btn btn-mini" id="thirdZoomIn" title="放大">＋</button>
-                <button class="btn btn-mini" id="thirdFit" title="缩放到适合宽度">适宽</button>
+                <button class="btn btn-mini" id="thirdFit" title="适合宽度">适宽</button>
               </div>
               <span id="thirdVisionInfo" class="hint"></span>
               <a id="btnThirdReport" class="btn btn-primary" href="#" download>导出报告</a>
@@ -199,35 +173,46 @@
           </div>
         </div>
 
-        <div class="workbench">
-          <aside class="side">
-            <div class="filters">
-              <select id="filterSev" class="select">
-                <option value="all">全部级别</option>
-                <option value="must">仅必改</option>
-                <option value="should">建议</option>
-                <option value="suggest">可选</option>
-              </select>
-              <select id="filterStatus" class="select">
-                <option value="all">全部状态</option>
-                <option value="pending">待处理</option>
-                <option value="accepted">已接受</option>
-                <option value="rejected">已忽略</option>
-              </select>
-            </div>
-            <div class="bulk">
-              <button id="btnAcceptMust" class="btn btn-mini">接受全部必改</button>
-              <button id="btnRejectSuggest" class="btn btn-mini">忽略全部可选</button>
-            </div>
-            <div id="findingList" class="finding-list"></div>
-          </aside>
-          <section class="detail" id="detail">
-            <div class="empty">选择左侧一条意见查看详情</div>
-          </section>
+        <!-- 文稿结果：正文 + 详情 + 安全区 -->
+        <div id="docResults">
+          <div class="workbench">
+            <section class="document" id="docBody">
+              <p class="doc-empty">选择右侧一条意见，正文会自动定位到对应位置。</p>
+            </section>
+            <section class="detail" id="detail">
+              <div class="empty">选择一条意见查看详情</div>
+            </section>
+          </div>
+          <div class="rail" id="rail">
+            <div class="rail-dots" id="railDots"></div>
+            <span class="rail-count" id="railCount">—</span>
+          </div>
         </div>
+
+        <!-- 意见清单：改为可滑出的浮层 -->
+        <aside class="side" id="sideList">
+          <div class="filters">
+            <select id="filterSev" class="select">
+              <option value="all">全部级别</option>
+              <option value="must">仅必改</option>
+              <option value="should">建议</option>
+              <option value="suggest">可选</option>
+            </select>
+            <select id="filterStatus" class="select">
+              <option value="all">全部状态</option>
+              <option value="pending">待处理</option>
+              <option value="accepted">已接受</option>
+              <option value="rejected">已忽略</option>
+            </select>
+          </div>
+          <div class="bulk">
+            <button id="btnAcceptMust" class="btn btn-mini">接受全部必改</button>
+            <button id="btnRejectSuggest" class="btn btn-mini">忽略全部可选</button>
+          </div>
+          <div id="findingList" class="finding-list"></div>
+        </aside>
       </section>
     </div>
-  </div>
 </main>
 
 <!-- ============ 设置 ============ -->

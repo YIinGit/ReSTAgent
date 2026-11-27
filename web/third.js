@@ -204,7 +204,8 @@
       }
       const active = sel && sel.message === f.message && sel.page === f.page;
       html += '<div class="tcard' + (active ? " is-active" : "") + '" data-tf="' + i + '">' +
-        '<div class="tcard-top"><span class="tcard-badge ' + esc(f.level) + '">' +
+        '<div class="tcard-top"><span class="tcard-no">' + (i + 1) + "</span>" +
+        '<span class="tcard-badge ' + esc(f.level) + '">' +
         (LEVEL_TEXT[f.level] || f.level) + "</span><span>" + esc(f.category || "") +
         '</span><span class="tcard-page">' + (f.page > 0 ? "第 " + f.page + " 页" : "全文") + "</span></div>" +
         '<div class="tcard-msg">' + esc(f.message || "") + "</div>" +
@@ -242,6 +243,9 @@
     T().lastZoom = zoom;
     const dispW = Math.max(160, Math.round(pxW * zoom));
 
+    // 本页意见按出现顺序编号，红框角上与左侧列表用同一个数字
+    const pageNo = {};
+    boxes.forEach((b, i) => { pageNo[b.message] = i + 1; });
     const marks = !hl ? "" : boxes.map((b) => {
       const box = b.box || [0, 0, 0, 0];
       const left = (box[0] / W) * 100;
@@ -251,7 +255,8 @@
       const active = sel && sel.message === b.message;
       return '<div class="pbox ' + esc(b.level) + (active ? " is-active" : "") + '" style="left:' +
         left.toFixed(2) + "%;top:" + top.toFixed(2) + "%;width:" + w.toFixed(2) + "%;height:" +
-        h.toFixed(2) + '%" title="' + esc(b.message || "") + '"></div>';
+        h.toFixed(2) + '%" title="' + esc(b.message || "") + '">' +
+        '<b class="pbox-no">' + (pageNo[b.message] || 0) + "</b></div>";
     }).join("");
     wrap.innerHTML = '<div class="page-inner" style="width:' + dispW + 'px"><img src="/api/third/' +
       j.id + "/page/" + pg.n + '" alt="第 ' + pg.n + ' 页" style="width:' + dispW +

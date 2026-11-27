@@ -1,0 +1,131 @@
+/* ReSTAgent 设计令牌
+ *
+ * 原则：
+ *   1. 所有颜色、字号、圆角、字体只能来自这里；style.css 里不允许出现新魔法值。
+ *   2. UI 层禁止非阶梯字号（11/12/13/15/18/24/40），稿件正文单独一档 16px。
+ *   3. 信号色只有一个（青绿），只表示「当前焦点 / 进度」，不做装饰。
+ *   4. 稿件区永远是纸白，不参与深色切换——这是刻意设计。
+ */
+
+:root{
+  /* ---------------- 字体：三层系统 ----------------
+   * 稿件用衬线（报刊感）、界面用无衬线（现代感）、数据用等宽（仪器感）。
+   * 「科技感」来自三者对比，不是加发光。 */
+  --font-serif: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC",
+                "SimSun", "STSong", serif;
+  --font-sans:  "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI",
+                system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:  "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas,
+                "Courier New", monospace;
+
+  /* ---------------- 字号阶梯：8 档 ----------------
+   * 规则：UI 层只用下面 7 个变量；稿件正文用 --t-doc。
+   * 原来的 11.5 / 12.5 / 13.5 全部并入相邻档。 */
+  --t-xs:  11px;   /* 徽标、序号、辅助 */
+  --t-sm:  12px;   /* 说明文字 */
+  --t-md:  13px;   /* UI 正文 */
+  --t-lg:  15px;   /* 面板标题 */
+  --t-xl:  18px;   /* 区块标题 */
+  --t-2xl: 24px;   /* 页面主标题 */
+  --t-3xl: 40px;   /* 进度大数字 / 步骤序号 */
+  --t-doc: 16px;   /* 稿件正文，衬线，行高 1.95 */
+
+  /* ---------------- 圆角 ----------------
+   * 5 种 → 4 档 */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-full: 999px;
+
+  /* ---------------- 动效 ----------------
+   * 只在状态跃迁时动：进度、定位、接受/忽略。 */
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --dur:  .45s;
+  --dur-fast: .15s;
+
+  /* ---------------- 纸：稿件区专用，不随主题变化 ---------------- */
+  --paper:      #FAF8F5;
+  --paper-ink:  #1A1A1A;
+  --paper-ink-2:#4A4A4A;
+  --paper-line: #E2DDD6;
+  --paper-mark: #FFE066;
+
+  /* ---------------- 语义色：仅用于严重度，不做装饰 ---------------- */
+  --sev-must:    #FF6B5E;
+  --sev-should:  #F5B14C;
+  --sev-suggest: #7A8AA0;
+  --sev-ink:     #1A0906;   /* 严重色块上的文字 */
+  --sev-suggest-ink: #FFFFFF;
+  --ok:          #5FD68B;
+
+  /* ---------------- 浅色主题（可选，默认深色） ---------------- */
+  --bg-0:  #F5F6F8;
+  --bg-1:  #FFFFFF;
+  --bg-2:  #FCFCFD;
+  --bg-3:  #F2F4F7;
+  --line:  #E4E7EC;
+  --line-strong: #D0D5DD;
+  --ink-1: #101828;
+  --ink-2: #344054;
+  --ink-3: #667085;
+  --signal:      #0E8C74;
+  --signal-dim:  #1F6E60;
+  --signal-glow: rgba(14, 140, 116, .16);
+  --signal-ink:  #FFFFFF;
+  --ok-soft:    #ECFDF3;
+  --ok-line:    #ABEFC6;
+  --warn-soft:  #FFFAEB;
+  --warn-line:  #FEDF89;
+  --danger-soft:#FEF3F2;
+  --danger-line:#FDA29B;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+}
+
+/* ---------------- 深色主题（主推） ----------------
+ * 不用纯黑：编辑久坐，纯黑+白字对比过强。 */
+
+/* ---------------- 兼容别名 ----------------
+ * style.css 现有 26 个变量名保持不变，值统一指向上面的令牌。
+ * 这样改主题只动 tokens.css 一处，不必逐个改选择器。 */
+:root{
+  --bg: var(--bg-0);
+  --panel: var(--bg-1);
+  --panel-2: var(--bg-2);
+  --panel-3: var(--bg-3);
+  --panel-4: var(--bg-3);
+  --field: var(--bg-1);
+  --ink: var(--ink-1);
+  --muted: var(--ink-3);
+  --accent: var(--signal);
+  --accent-soft: var(--signal-glow);
+  --accent-ink: var(--signal-ink);
+  --danger: var(--sev-must);
+  --warn: var(--sev-should);
+  --mark: var(--paper-mark);
+  --radius: var(--r-md);
+  --radius-sm: var(--r-sm);
+}
+
+[data-theme="dark"]{
+  --bg-0:  #0B0F14;
+  --bg-1:  #11161D;
+  --bg-2:  #181F28;
+  --bg-3:  #212A35;
+  --line:  #232C38;
+  --line-strong: #33404F;
+  --ink-1: #E8EDF3;
+  --ink-2: #A9B4C2;
+  --ink-3: #6C7889;
+  --signal:      #4FE3C1;
+  --signal-dim:  #1F6E60;
+  --signal-glow: rgba(79, 227, 193, .18);
+  --signal-ink:  #04120F;
+  --ok:          #5FD68B;
+  --ok-soft:     #12261B;
+  --ok-line:     #2F6A49;
+  --warn-soft:   #2A2113;
+  --warn-line:   #6B5426;
+  --danger-soft: #2E1614;
+  --danger-line: #7D3A33;
+  --shadow: none;
+}
