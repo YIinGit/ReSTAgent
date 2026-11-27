@@ -54,6 +54,12 @@ elif os.environ.get("RESTAGENT_SECRET_DIR"):
     SECRET_PATH = pathlib.Path(os.environ["RESTAGENT_SECRET_DIR"]) / "admin_secret.py"
     if not SECRET_PATH.exists():
         _seed_from_resource(SECRET_PATH)
+elif (paths.ROOT / "admin_secret.py").exists():
+    # 用户数据目录就在仓库根（config.json 在根目录）时，密码文件也放这里，
+    # 已经被 .gitignore 排除，不会进公开仓库。
+    SECRET_PATH = paths.ROOT / "admin_secret.py"
+elif (paths.ROOT / "user" / "admin_secret.py").exists():
+    SECRET_PATH = paths.ROOT / "user" / "admin_secret.py"
 else:
     SECRET_PATH = paths.ROOT / "app" / "admin_secret.py"
 

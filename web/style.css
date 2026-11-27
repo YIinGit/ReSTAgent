@@ -463,3 +463,12 @@ textarea.input{width:100%;min-height:70px;resize:vertical;line-height:1.7;font-f
   0%,100%{box-shadow:0 0 0 2px rgba(43,89,212,.55)}
   50%{box-shadow:0 0 0 8px rgba(43,89,212,.12)}
 }
+
+/* 「策审」入口：与零/一/二/三审按钮同样的外观，但整体进入独立页面 */
+.stage-link{
+  margin-top:8px;text-decoration:none;color:inherit;
+  border-style:dashed;
+}
+.stage-link:hover{border-color:var(--accent);border-style:solid;background:var(--accent-soft)}
+.stage-link .stage-name::after{content:" →";color:var(--accent)}
+.stage-note{font-size:12px;color:var(--muted);margin:6px 0 0;line-height:1.5}

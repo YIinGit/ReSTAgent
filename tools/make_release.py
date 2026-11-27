@@ -28,15 +28,18 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "0.2"
-OUT = ROOT / "release" / ("ReSTAgent_v%s" % VERSION)
+OUT = ROOT / "release" / ("ReSTAgent/%s" % VERSION)
 
 COPY_TREES = ["app", "web", "vendor", "docs"]
 COPY_FILES = ["ReSTAgent.bat", "ReSTAgent.pyw", "README.md"]
 SKIP_DIRS = {"__pycache__", ".pytest_cache", ".git"}
 SKIP_SUFFIX = {".pyc", ".pyo"}
 # 敏感/生成文件：绝不进发行包
+# 内部材料：不进发行包、不进仓库
+IGNORE_EXTRA = {"2026活动部教案-给AI的版本.docx", "AI评审提示词.md"}
+
 SKIP_FILES = {"admin_secret.py", "config.json", "layout_rules.json",
-              "2026活动部教案-给AI的版本.docx"}
+              "2026活动部教案-给AI的版本.docx"} | IGNORE_EXTRA
 
 
 def copytree(src: pathlib.Path, dst: pathlib.Path) -> int:
@@ -92,6 +95,13 @@ def main() -> int:
             shutil.copy2(src, OUT / name)
             print("  + %-10s" % name)
             total += 1
+
+    # 提示词是内部材料，不进仓库，但随发行包分发（没有它就退回内置精简版）
+    pm = ROOT / "docs" / "AI评审提示词.md"
+    if pm.exists():
+        (OUT / "docs").mkdir(exist_ok=True)
+        shutil.copy2(pm, OUT / "docs" / pm.name)
+        print("  ~ docs/%-10s（内部材料，仅随发行包分发）" % pm.name)
 
     c = make_sample_pack(OUT)
     if c:
