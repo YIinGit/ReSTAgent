@@ -100,7 +100,7 @@ body{
   width:100%; max-width:1560px; min-height:100svh;
   display:grid;
   grid-template-columns:minmax(0,47fr) minmax(0,53fr);
-  grid-template-rows:1fr auto;
+  grid-template-rows:1fr;
 }
 
 .zone{ display:flex; align-items:center; min-width:0; }
@@ -449,3 +449,6 @@ body{
   transition:color .2s var(--e-soft),border-color .2s var(--e-soft);
 }
 .cover-tools:hover{color:var(--signal);border-color:var(--signal-dim)}
+
+/* 固定版权页脚占位：封面网格底部留白 */
+.cover{padding-bottom:34px}

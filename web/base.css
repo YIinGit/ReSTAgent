@@ -1,0 +1,177 @@
+/* ReSTAgent 基础组件（v0.4）
+ *
+ * 职责边界：
+ *   tokens.css  —— 变量（颜色/字号/圆角/字体）
+ *   base.css    —— 通用控件：按钮、面板、输入、抽屉、提示
+ *   layout.css  —— 页面布局：设置页两栏、结果页正文+安全区、三审页
+ *
+ * 不再叠加旧的 style.css，避免两套规则打架。
+ */
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg-0);color:var(--ink-1);
+  font:var(--t-md)/1.62 var(--font-sans);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{margin:0;font-weight:600}
+p{margin:0}
+button{font:inherit;color:inherit}
+a{color:inherit}
+.is-hidden{display:none !important}
+.muted{color:var(--ink-3)}
+em{font-style:normal}
+
+/* ---------------- 顶栏 ---------------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  height:56px;padding:0 20px;gap:14px;
+  background:var(--bg-1);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:50;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{
+  width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;
+  background:var(--signal);color:var(--signal-ink);
+  font:700 var(--t-md)/1 var(--font-mono);
+}
+.brand h1{font-size:var(--t-md);letter-spacing:.3px;white-space:nowrap}
+.ver{font-size:var(--t-xs);font-weight:400;color:var(--ink-3);margin-left:3px}
+.tagline{font-size:var(--t-xs);color:var(--ink-3);margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:4px}
+
+/* ---------------- 按钮 ---------------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:32px;padding:0 14px;border-radius:var(--r-sm);
+  font-size:var(--t-sm);border:1px solid var(--line-strong);
+  background:var(--bg-2);color:var(--ink-1);cursor:pointer;white-space:nowrap;
+  text-decoration:none;
+  transition:background var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast);
+}
+.btn:hover{background:var(--bg-3)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-primary{background:var(--signal);border-color:var(--signal);color:var(--signal-ink);font-weight:600}
+.btn-primary:hover{filter:brightness(1.08);background:var(--signal)}
+.btn-ghost{background:transparent;border-color:var(--line)}
+.btn-ghost:hover{background:var(--bg-3);border-color:var(--line-strong)}
+.btn-mini{height:26px;padding:0 9px;font-size:var(--t-xs)}
+.btn-lg{height:44px;padding:0 22px;font-size:var(--t-md)}
+
+/* ---------------- 表单 ---------------- */
+.input,.select,textarea.input{
+  width:100%;background:var(--bg-2);border:1px solid var(--line);
+  border-radius:var(--r-sm);color:var(--ink-1);
+  font:var(--t-sm)/1.5 var(--font-sans);padding:8px 10px;
+}
+textarea.input{min-height:84px;resize:vertical}
+.input:focus,.select:focus{outline:none;border-color:var(--signal)}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field>span{font-size:var(--t-sm);color:var(--ink-2)}
+.check{display:flex;align-items:flex-start;gap:8px;font-size:var(--t-sm);color:var(--ink-2);cursor:pointer}
+.models{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.models label{display:flex;flex-direction:column;gap:4px;font-size:var(--t-xs);color:var(--ink-3)}
+
+/* ---------------- 面板 ---------------- */
+.panel{background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 20px}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.panel-head h2{font-size:var(--t-lg)}
+.hint{font-size:var(--t-sm);color:var(--ink-3)}
+.pill{
+  font:var(--t-xs)/1 var(--font-mono);padding:5px 9px;border-radius:var(--r-full);
+  border:1px solid var(--line);background:var(--bg-2);color:var(--ink-3);white-space:nowrap;
+}
+.pill-ok{border-color:var(--ok-line);color:var(--ok)}
+.pill-warn{border-color:var(--warn-line);color:var(--sev-should)}
+.pill-muted{color:var(--ink-3)}
+.notice{padding:8px 16px;background:var(--warn-soft);color:var(--sev-should);font-size:var(--t-sm)}
+
+/* ---------------- 抽屉（设置 / 规则库 / 管理员） ---------------- */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60}
+.drawer{
+  position:fixed;top:0;right:0;height:100vh;width:440px;max-width:94vw;
+  background:var(--bg-1);border-left:1px solid var(--line);z-index:70;
+  display:flex;flex-direction:column;
+}
+.drawer-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;border-bottom:1px solid var(--line);
+}
+.drawer-head h2{font-size:var(--t-lg)}
+.drawer-body{padding:18px 20px;overflow:auto;flex:1}
+.drawer-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.staff-head{margin-top:22px}
+.staff-list{display:flex;flex-direction:column;gap:6px}
+.staff-item{font-size:var(--t-sm);color:var(--ink-2)}
+
+/* ---------------- 规则库 ---------------- */
+.rules-list{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}
+.rule-group{border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;background:var(--bg-2)}
+.rule-group-title{font-size:var(--t-xs);color:var(--ink-3);letter-spacing:.4px;margin-bottom:6px}
+.rule-row{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:var(--t-sm);color:var(--ink-2);cursor:pointer}
+.lay-row{display:grid;grid-template-columns:1fr 110px 34px;align-items:center;gap:8px;font-size:var(--t-sm)}
+.lay-row em{font-size:var(--t-xs);color:var(--ink-3)}
+.layout-rules{display:flex;flex-direction:column;gap:10px}
+.lay-fields{display:flex;flex-direction:column;gap:6px}
+
+/* ---------------- 提示条 / 空态 / 徽标 ---------------- */
+.banner{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;border-radius:var(--r-sm);
+  border:1px solid var(--ok-line);background:var(--ok-soft);
+  color:var(--ink-1);font-size:var(--t-sm);margin-bottom:14px;
+}
+.toast{
+  position:fixed;left:50%;bottom:28px;transform:translateX(-50%);
+  max-width:80vw;padding:10px 16px;border-radius:var(--r-md);
+  background:var(--bg-3);color:var(--ink-1);
+  border:1px solid var(--line-strong);font-size:var(--t-sm);
+  box-shadow:0 10px 30px rgba(0,0,0,.35);z-index:90;
+}
+.toast.err{border-color:var(--danger-line);color:var(--sev-must)}
+.empty{padding:36px 16px;text-align:center;color:var(--ink-3);font-size:var(--t-sm)}
+
+/* ---------------- AI 实时输出 ---------------- */
+.ai-panel{
+  position:fixed;right:16px;bottom:16px;width:380px;max-width:90vw;height:250px;
+  background:var(--bg-1);border:1px solid var(--line);border-radius:var(--r-md);
+  display:flex;flex-direction:column;z-index:80;
+}
+.ai-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);font-size:var(--t-xs);color:var(--ink-3)}
+.ai-out{
+  flex:1;margin:0;padding:10px 12px;overflow:auto;
+  font:var(--t-xs)/1.7 var(--font-mono);color:var(--ink-2);white-space:pre-wrap;
+}
+
+/* ---------------- 错误提示条（JS 异常时可见） ---------------- */
+#jsError{
+  position:fixed;left:0;right:0;bottom:0;z-index:999;
+  padding:10px 16px;background:var(--danger-soft);color:var(--sev-must);
+  border-top:1px solid var(--danger-line);
+  font:var(--t-xs)/1.5 var(--font-mono);white-space:pre-wrap;
+}
+
+/* ---------------- 页脚版权（三页共用，始终可见） ---------------- */
+.site-foot{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;
+  height:34px;padding:0 16px;
+  background:var(--bg-1);border-top:1px solid var(--line);
+  font-size:var(--t-xs);color:var(--ink-3);
+}
+.sta-logo{height:15px;width:auto;opacity:.85}
+.foot-copy,.foot-credit{white-space:nowrap}
+.foot-credit{color:var(--ink-2)}
+.foot-sep{opacity:.5}
+/* 深色主题：蓝标转白（单色 SVG 用滤镜即可，不用另存文件） */
+[data-theme="dark"] .sta-logo{filter:brightness(0) invert(1);opacity:.8}
+[data-theme="light"] .sta-logo{opacity:.9}
+
+/* 给固定页脚留出空间 */
+body{padding-bottom:34px}
+@media (max-width:640px){
+  .site-foot{height:auto;padding:6px 12px;gap:6px}
+  .foot-copy{white-space:normal;text-align:center;line-height:1.5}
+  body{padding-bottom:56px}
+}
