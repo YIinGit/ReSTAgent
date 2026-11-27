@@ -108,6 +108,13 @@ def main() -> int:
         print("  + %-10s %4d 个文件（仅示例 Word）" % ("samples/", c))
         total += c
 
+    # 发行说明
+    rel = ROOT / ("RELEASE_v%s.md" % VERSION)
+    if rel.exists():
+        shutil.copy2(rel, OUT / rel.name)
+        print("  + %-10s" % rel.name)
+        total += 1
+
     # 版本信息（供界面显示与排查）
     (OUT / "VERSION.txt").write_text(
         "ReSTAgent v%s\n构建于 %s\n" % (VERSION, __import__("time").strftime("%Y-%m-%d %H:%M")),
