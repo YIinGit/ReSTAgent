@@ -246,9 +246,16 @@ class Handler(BaseHTTPRequestHandler):
         try:
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
-            if path in ("/", "/index.html"):
+            if path in ("/", "/index.html", "/cover"):
+                # 首页 = 封面：两条流程入口，进入后才到工作台
                 HITS["n"] += 1
-                # 带 ?t=token 访问首页时下发 cookie，后续静态与接口请求都不用再带参数
+                q = urllib.parse.parse_qs(parsed.query)
+                extra = {}
+                if (q.get("t") or [""])[0] and secrets.compare_digest((q["t"][0]), SESSION_TOKEN):
+                    extra["Set-Cookie"] = "ra_token=%s; Path=/; SameSite=Strict" % SESSION_TOKEN
+                return self._static("cover.html", extra=extra)
+            if path in ("/app", "/app.html"):
+                # 工作台：编辑部的零/一/二/三审
                 q = urllib.parse.parse_qs(parsed.query)
                 extra = {}
                 if (q.get("t") or [""])[0] and secrets.compare_digest((q["t"][0]), SESSION_TOKEN):

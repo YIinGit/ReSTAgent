@@ -7,18 +7,18 @@
 <script>try{var t=localStorage.getItem("restagent.theme");if(!t)t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}</script>
 <link rel="icon" href="/static/icon.png" />
 <link rel="stylesheet" href="/static/tokens.css" />
-<link rel="stylesheet" href="/static/style.css" />
+<link rel="stylesheet" href="/static/base.css" />
 <link rel="stylesheet" href="/static/layout.css" />
 </head>
 <body>
 <header class="topbar">
-  <div class="brand">
+  <a class="brand" href="/" title="返回封面" style="text-decoration:none">
     <div class="logo">R</div>
     <div>
       <h1>ReSTAgent <span id="appVersion" class="ver">v0.3</span></h1>
       <p class="tagline">本机运行 · 数据不外传</p>
     </div>
-  </div>
+  </a>
   <div class="topbar-right">
     <span id="apiState" class="pill pill-muted">检测中…</span>
     <div class="recent">
@@ -406,5 +406,20 @@
 <script src="/static/app.js"></script>
 <script src="/static/third.js"></script>
 <script src="/static/layout_rules.js"></script>
+<div id="jsError" class="is-hidden"></div>
+<script>
+window.addEventListener("error", function (e) {
+  var b = document.getElementById("jsError");
+  if (!b) return;
+  b.classList.remove("is-hidden");
+  b.textContent = "界面脚本出错：" + (e.message || e.error) + "  @ " + (e.filename || "").split("/").pop() + ":" + e.lineno;
+});
+window.addEventListener("unhandledrejection", function (e) {
+  var b = document.getElementById("jsError");
+  if (!b) return;
+  b.classList.remove("is-hidden");
+  b.textContent = "界面请求失败：" + ((e.reason && e.reason.message) || e.reason);
+});
+</script>
 </body>
 </html>

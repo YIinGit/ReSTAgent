@@ -1,0 +1,401 @@
+/* ════════════════════════════════════════════════════════════════════════
+   ReSTAgent 封面
+   ────────────────────────────────────────────────────────────────────────
+   版面：grid 两区（左品牌 47% / 右分流 53%）+ 通栏页脚，中间一条贯通的竖线。
+       竖线把上下留白收进"版面结构"里，而不是让内容漂在大片空虚中。
+
+   不变量
+   · 位置全部由 grid / flex 决定，没有写死坐标
+   · 可变字符 A 用真实字体字形换字 → 字重/基线/字宽天然一致
+   · 只对 transform / opacity 做动画
+   ════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --bg:        #07090B;
+  --ink-1:     #EDF1F5;
+  --ink-2:     #9AA5B4;
+  --ink-3:     #78838F;
+  --line:      rgba(255,255,255,.085);
+  --line-2:    rgba(255,255,255,.17);
+  --signal:    #4FE3C1;
+  --signal-dim:rgba(79,227,193,.5);
+
+  /* 拉丁优先 → 中文回退：中英文各取最佳字面 */
+  --font-display:"Segoe UI Variable Display","Segoe UI",-apple-system,
+                 "PingFang SC","HarmonyOS Sans SC","Microsoft YaHei UI",sans-serif;
+  --font-sans:   "Segoe UI Variable Text","Segoe UI",-apple-system,
+                 "PingFang SC","Microsoft YaHei UI","Microsoft YaHei",sans-serif;
+  --font-serif:  "Songti SC","Source Han Serif SC","Noto Serif CJK SC",
+                 "STSong",SimSun,serif;
+  --font-mono:   "JetBrains Mono","Cascadia Mono","Cascadia Code","SF Mono",
+                 Consolas,"Liberation Mono",monospace;
+
+  --e-out:  cubic-bezier(.16,1,.3,1);
+  --e-soft: cubic-bezier(.22,1,.36,1);
+}
+
+*,*::before,*::after{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; height:100%; }
+
+body{
+  background:var(--bg);
+  color:var(--ink-1);
+  font-family:var(--font-sans);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+
+/* ════════════ 一、画布 ════════════════════════════════════════════════ */
+.cover{
+  position:relative;
+  min-height:100svh;
+  display:flex;
+  justify-content:center;
+  overflow:hidden;
+  background:radial-gradient(130% 85% at 6% -14%, #10161B 0%, transparent 55%), var(--bg);
+  transition:opacity .62s var(--e-out), transform .72s var(--e-out), filter .62s var(--e-out);
+}
+.cover.is-leaving{
+  opacity:0; transform:translateY(-2.2vh) scale(1.012);
+  filter:blur(6px); pointer-events:none;
+}
+.cover.is-done{ opacity:0; pointer-events:none; }
+
+/* 氛围层 */
+.cover-atmos{ position:absolute; inset:0; pointer-events:none; z-index:0; }
+.atmos-light{
+  position:absolute; inset:0;
+  background:radial-gradient(46vmax 46vmax at var(--mx,18%) var(--my,28%),
+             rgba(79,227,193,.06) 0%, rgba(79,227,193,.018) 40%, transparent 68%);
+  transition:background .5s linear;
+}
+.atmos-grain{
+  position:absolute; inset:0; opacity:.045; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'>\
+<filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/></filter>\
+<rect width='128' height='128' filter='url(%23n)'/></svg>");
+  background-size:128px 128px;
+}
+.cover::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:1;
+  background:radial-gradient(128% 96% at 46% 44%, transparent 56%, rgba(0,0,0,.46) 100%);
+}
+
+/* 四角套准线 */
+.reg{
+  position:absolute; width:12px; height:12px; z-index:4;
+  border:0 solid rgba(255,255,255,.22); opacity:0;
+  animation:regIn .7s var(--e-out) forwards;
+}
+.reg-tl{ top:20px; left:20px;  border-top-width:1px; border-left-width:1px;  animation-delay:.05s; }
+.reg-tr{ top:20px; right:20px; border-top-width:1px; border-right-width:1px; animation-delay:.11s; }
+.reg-bl{ bottom:20px; left:20px;  border-bottom-width:1px; border-left-width:1px;  animation-delay:.17s; }
+.reg-br{ bottom:20px; right:20px; border-bottom-width:1px; border-right-width:1px; animation-delay:.23s; }
+@keyframes regIn{ from{opacity:0;transform:scale(.35)} to{opacity:1;transform:scale(1)} }
+
+/* ════════════ 二、版面网格 ════════════════════════════════════════════ */
+.cover-grid{
+  position:relative; z-index:2;
+  width:100%; max-width:1560px; min-height:100svh;
+  display:grid;
+  grid-template-columns:minmax(0,47fr) minmax(0,53fr);
+  grid-template-rows:1fr auto;
+}
+
+.zone{ display:flex; align-items:center; min-width:0; }
+
+.zone-brand{
+  grid-column:1; grid-row:1;
+  padding:clamp(72px,10vh,120px)
+          clamp(28px,3.4vw,56px)
+          clamp(56px,8vh,96px)
+          clamp(30px,5.2vw,92px);
+}
+
+.zone-choices{
+  grid-column:2; grid-row:1;
+  position:relative;
+  padding:clamp(72px,10vh,120px)
+          clamp(30px,4.6vw,80px)
+          clamp(56px,8vh,96px)
+          clamp(30px,4.6vw,80px);
+}
+
+/* 贯通竖线：顶部渐入，向下贯通到页脚 —— 把留白收进版面结构 */
+.zone-choices::before{
+  content:"";
+  position:absolute; left:0; top:0; bottom:0; width:1px;
+  background:var(--line);
+  -webkit-mask-image:linear-gradient(to bottom, transparent 0, #000 14%);
+  mask-image:linear-gradient(to bottom, transparent 0, #000 14%);
+}
+
+/* 右区极轻的纵向渐层，给这一侧一点"面板"厚度 */
+.zone-choices::after{
+  content:"";
+  position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.014), transparent 42%);
+}
+
+/* ── 左区：品牌 ──────────────────────────────────────────────────── */
+.brand{ min-width:0; width:100%; }
+
+.eyebrow{
+  margin:0 0 clamp(18px,2.4vh,26px);
+  display:flex; align-items:center; gap:11px;
+  opacity:0; animation:riseIn .8s var(--e-out) .08s forwards;
+}
+.eyebrow-dot{
+  width:5px; height:5px; flex:none; border-radius:50%;
+  background:var(--signal); box-shadow:0 0 0 3px rgba(79,227,193,.13);
+}
+.eyebrow-latin{
+  font-family:var(--font-mono); font-size:10.5px; font-weight:500;
+  letter-spacing:.19em; text-transform:uppercase; color:var(--ink-2);
+}
+.eyebrow-sep{ width:16px; height:1px; background:var(--line-2); flex:none; }
+.eyebrow-cn{ font-size:11.5px; letter-spacing:.16em; color:var(--ink-3); }
+
+/* 词标 */
+.wordmark{
+  margin:0; display:block; white-space:nowrap;
+  font-family:var(--font-display);
+  font-size:clamp(50px, 6.6vw, 96px);
+  font-weight:600;
+  line-height:1;
+  letter-spacing:-.03em;
+  color:var(--ink-1);
+  opacity:0;
+  animation:riseIn 1s var(--e-out) .16s forwards;
+}
+.wm-part{ display:inline; }
+
+/* 可变字符槽（SVG 版）
+   盒子 = A 的 advance(0.666em) × capHeight(0.703em)，底边贴基线，
+   所以它和右侧字母的间距、基线完全一致；换形不会撑动排版。 */
+.wm-glyph{
+  display:inline-block;
+  width:.666em;
+  height:.703em;
+  vertical-align:baseline;
+  overflow:visible;
+  color:var(--ink-1);
+  transition:color .32s var(--e-soft);
+}
+.wm-glyph .bm-svg{ display:block; overflow:visible; }
+.wm-glyph .bm-p{
+  fill:none;
+  stroke:currentColor;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.wm-glyph .bm-p-b{ opacity:0; }
+.wm-glyph .bm-dot{ transition:opacity .35s ease, transform .5s cubic-bezier(.22,1,.36,1); }
+.wordmark:hover .wm-glyph{ color:var(--signal); }
+
+/* 分隔线：短绿色信号段 + 细灰线 */
+.brand-rule{
+  height:1px; margin:clamp(24px,3.2vh,36px) 0 clamp(22px,2.8vh,32px);
+  background:var(--line-2); overflow:hidden;
+}
+.brand-rule i{
+  display:block; height:100%; width:88px; background:var(--signal);
+  transform:scaleX(0); transform-origin:left center;
+  animation:ruleIn .8s var(--e-out) .52s forwards;
+}
+@keyframes ruleIn{ to{ transform:scaleX(1); } }
+
+/* 陈述句：衬线 */
+.statement{
+  margin:0 0 16px;
+  font-family:var(--font-serif);
+  font-size:clamp(19px,1.6vw,25px);
+  line-height:1.9;
+  letter-spacing:.015em;
+  color:var(--ink-1);
+  opacity:0; animation:riseIn .9s var(--e-out) .58s forwards;
+}
+.statement-sub{
+  margin:0;
+  font-size:12.5px; letter-spacing:.05em; color:var(--ink-2);
+  opacity:0; animation:riseIn .9s var(--e-out) .7s forwards;
+}
+.statement-sub .dot{ margin:0 9px; color:var(--ink-3); }
+
+/* ── 右区：两个入口 ──────────────────────────────────────────────── */
+.choices{ position:relative; z-index:1; min-width:0; width:100%; display:flex; flex-direction:column; }
+
+.choices-eyebrow{
+  margin:0 0 clamp(14px,2vh,20px);
+  font-family:var(--font-mono); font-size:10px;
+  letter-spacing:.24em; text-transform:uppercase; color:var(--ink-3);
+  opacity:0; animation:riseIn .7s var(--e-out) .5s forwards;
+}
+.choices-eyebrow::before{
+  content:""; display:inline-block; width:18px; height:1px;
+  background:var(--signal-dim); vertical-align:middle;
+  margin-right:10px;
+}
+
+.row{
+  position:relative;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:start;
+  column-gap:clamp(16px,2vw,28px);
+  padding:clamp(24px,3.4vh,36px) 0;
+  border-top:1px solid var(--line);
+  color:inherit; text-decoration:none; cursor:pointer;
+  opacity:0;
+  animation:rowIn .8s var(--e-out) forwards;
+  animation-delay:calc(.56s + var(--i) * .09s);
+  transition:background .32s var(--e-soft);
+}
+.row:last-of-type{ border-bottom:1px solid var(--line); }
+
+.row::before{
+  content:""; position:absolute; left:0; top:0; bottom:0; width:2px;
+  background:var(--signal);
+  transform:scaleY(0); transition:transform .34s var(--e-out);
+}
+.row::after{
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(90deg, rgba(79,227,193,.05), transparent 58%);
+  opacity:0; transition:opacity .34s var(--e-soft);
+}
+
+.row-no{
+  font-family:var(--font-mono); font-size:10.5px;
+  letter-spacing:.14em; line-height:1; color:var(--ink-3);
+  padding-top:.82em;                    /* 与标题 cap 线对齐 */
+  transition:color .3s var(--e-soft);
+}
+.row-body{ min-width:0; display:block; }
+.row-title{
+  display:block;
+  font-size:clamp(21px,1.72vw,26px);
+  font-weight:600; line-height:1.3; letter-spacing:-.012em;
+  color:var(--ink-1); transition:color .3s var(--e-soft);
+}
+.row-desc{
+  display:block; margin-top:8px;
+  font-size:14px; line-height:1.78; color:var(--ink-2);
+  max-width:32em; transition:color .3s var(--e-soft);
+}
+.row-meta{
+  display:block; margin-top:12px;
+  font-family:var(--font-mono); font-size:10px;
+  letter-spacing:.15em; text-transform:uppercase; color:var(--ink-3);
+}
+.row-meta .sep{ margin:0 .55em; opacity:.45; }
+
+.row-go{
+  align-self:center; display:grid; place-items:center;
+  width:38px; height:38px; border:1px solid var(--line-2); border-radius:50%;
+  color:var(--ink-2);
+  transition:color .3s var(--e-soft), border-color .3s var(--e-soft),
+             background .3s var(--e-soft), transform .34s var(--e-out);
+}
+
+.row:hover::before{ transform:scaleY(1); }
+.row:hover::after{ opacity:1; }
+.row:hover{ background:rgba(255,255,255,.015); }
+.row:hover .row-title{ color:#fff; }
+.row:hover .row-desc{ color:var(--ink-1); }
+.row:hover .row-no{ color:var(--signal); }
+.row:hover .row-go{
+  color:var(--signal); border-color:var(--signal-dim);
+  background:rgba(79,227,193,.09); transform:translateX(4px);
+}
+.row:active .row-go{ transform:translateX(4px) scale(.94); }
+.row:focus-visible{ outline:2px solid var(--signal); outline-offset:6px; border-radius:2px; }
+
+.choices-note{
+  margin:clamp(20px,2.8vh,30px) 0 0;
+  font-size:11.5px; letter-spacing:.03em; color:var(--ink-3);
+  opacity:0; animation:riseIn .8s var(--e-out) .92s forwards;
+}
+
+/* ── 页脚：通栏，与竖线相交 ──────────────────────────────────────── */
+.cover-foot{
+  grid-column:1 / -1; grid-row:2;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:clamp(18px,2.4vh,24px)
+          clamp(30px,5.2vw,92px)
+          clamp(22px,3.2vh,30px);
+  border-top:1px solid var(--line);
+
+  font-family:var(--font-mono); font-size:10px;
+  letter-spacing:.17em; text-transform:uppercase; color:var(--ink-3);
+
+  opacity:0; animation:footIn .9s var(--e-out) 1.02s forwards;
+}
+.cover-foot b{ font-weight:500; color:var(--ink-2); letter-spacing:.06em; }
+.cover-foot .dot{ margin:0 .6em; opacity:.45; }
+.foot-end{ display:flex; align-items:center; gap:9px; }
+.sig-dot{
+  width:5px; height:5px; border-radius:50%; background:var(--signal);
+  box-shadow:0 0 0 3px rgba(79,227,193,.11);
+  animation:breathe 2.6s ease-in-out infinite;
+}
+
+/* ── 平板 / 窄屏：单栏纵向堆叠 ──────────────────────────────────── */
+@media (max-width:1100px){
+  .cover-grid{
+    grid-template-columns:1fr;
+    grid-template-rows:auto auto auto;
+    align-content:center;
+  }
+  .zone-brand{
+    grid-column:1; grid-row:1;
+    padding:clamp(72px,11vh,120px) clamp(28px,6vw,64px) clamp(30px,4vh,44px);
+  }
+  /* 堆叠后竖线改为横向分隔：必须关掉伪元素，否则会在屏幕左缘留一条竖线 */
+  .zone-choices::before, .zone-choices::after{ display:none; }
+  .zone-choices{
+    grid-column:1; grid-row:2;
+    border-top:1px solid var(--line);
+    padding:clamp(30px,4vh,44px) clamp(28px,6vw,64px) clamp(44px,7vh,72px);
+    align-items:flex-start;
+  }
+  .cover-foot{ grid-column:1; grid-row:3; }
+  .wordmark{ font-size:clamp(46px, 8.6vw, 76px); }
+}
+@media (max-width:620px){
+  .foot-mid{ display:none; }
+  .row-go{ width:34px; height:34px; }
+}
+
+/* ════════════ 三、关键帧 ════════════════════════════════════════════ */
+@keyframes riseIn{ from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+@keyframes rowIn{ from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+@keyframes footIn{ from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+@keyframes breathe{ 0%,100%{opacity:.35;transform:scale(.9)} 50%{opacity:1;transform:scale(1.1)} }
+
+/* ════════════ 四、原型反馈 ══════════════════════════════════════════ */
+.toast-proto{
+  position:fixed; left:50%; bottom:34px; z-index:200;
+  transform:translateX(-50%) translateY(10px);
+  padding:10px 18px; border:1px solid var(--line-2); border-radius:999px;
+  background:rgba(10,13,17,.94); color:var(--ink-1);
+  font-size:12.5px; letter-spacing:.04em; opacity:0;
+  transition:opacity .3s var(--e-soft), transform .4s var(--e-out);
+}
+.toast-proto.is-in{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ════════════ 五、无障碍 ════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.001ms !important;
+  }
+  .eyebrow,.wordmark,.statement,.statement-sub,.row,.choices-note,
+  .choices-eyebrow,.cover-foot,.reg{
+    opacity:1 !important; transform:none !important;
+  }
+  .brand-rule i{ transform:scaleX(1) !important; }
+  .sig-dot{ animation:none; opacity:.8; }
+  .cover.is-leaving{ filter:none; transform:none; }
+}

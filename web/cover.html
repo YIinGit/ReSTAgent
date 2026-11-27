@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ReSTAgent · 文稿审读工作台</title>
+<script>try{document.documentElement.dataset.theme="dark";}catch(e){}</script>
+<link rel="icon" href="/static/icon.png" />
+<link rel="stylesheet" href="/static/cover.css" />
+</head>
+<body class="cover-body">
+
+<div id="cover" class="cover" data-state="idle">
+
+  <!-- 氛围：跟随鼠标的光 + 噪点 + 暗角 -->
+  <div class="cover-atmos" aria-hidden="true">
+    <div class="atmos-light"></div>
+    <div class="atmos-grain"></div>
+  </div>
+
+  <!-- 四角套准线 -->
+  <span class="reg reg-tl" aria-hidden="true"></span>
+  <span class="reg reg-tr" aria-hidden="true"></span>
+  <span class="reg reg-bl" aria-hidden="true"></span>
+  <span class="reg reg-br" aria-hidden="true"></span>
+
+  <!-- 版面：左品牌 / 右分流 / 底页脚；中间一条贯通的竖线 -->
+  <div class="cover-grid">
+
+    <section class="zone zone-brand">
+      <div class="brand">
+        <p class="eyebrow">
+          <span class="eyebrow-dot" aria-hidden="true"></span>
+          <span class="eyebrow-latin">Local&nbsp;AI</span>
+          <span class="eyebrow-sep" aria-hidden="true"></span>
+          <span class="eyebrow-cn">文稿审读工作台</span>
+        </p>
+
+        <!-- 词标：A 是可变字符槽，其余走正常文字流。
+             aria-label 保证读屏器读作 ReSTAgent，内部视觉内容对读屏器隐藏。 -->
+        <h1 class="wordmark" id="wordmark" aria-label="ReSTAgent">
+          <span class="wm-part" aria-hidden="true">ReST</span><span class="wm-glyph" id="wmGlyph" aria-hidden="true">A</span><span class="wm-part" aria-hidden="true">gent</span>
+        </h1>
+
+        <div class="brand-rule" aria-hidden="true"><i></i></div>
+
+        <p class="statement">
+          在自己的电脑上，<br />
+          完成从零审到三审的全部工序。
+        </p>
+        <p class="statement-sub">
+          不改原文件<span class="dot">·</span>意见逐条可用<span class="dot">·</span>结果另存
+        </p>
+      </div>
+    </section>
+
+    <section class="zone zone-choices">
+      <nav class="choices" aria-label="选择审查流程">
+
+        <p class="choices-eyebrow" aria-hidden="true">选择流程</p>
+
+        <a class="row" href="/app" data-go="app" style="--i:0">
+          <span class="row-no">01</span>
+          <span class="row-body">
+            <span class="row-title">编辑部文稿审查</span>
+            <span class="row-desc">零审 · 一审 · 二审 · 三审，逐条给出意见，导出带修订与批注的 Word</span>
+            <span class="row-meta">Word<span class="sep">·</span>IDML<span class="sep">·</span>PDF<span class="sep">/</span>4 个环节</span>
+          </span>
+          <span class="row-go" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+                 stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h12.5M12.5 6.5 18 12l-5.5 5.5" />
+            </svg>
+          </span>
+        </a>
+
+        <a class="row" href="/campaign" data-go="campaign" style="--i:1">
+          <span class="row-no">02</span>
+          <span class="row-body">
+            <span class="row-title">活动部策划案审查</span>
+            <span class="row-desc">依据《2026 活动部教案》核查板块、目标、流程与风险，输出批注版</span>
+            <span class="row-meta">Word<span class="sep">·</span>教案比对<span class="sep">/</span>独立流程</span>
+          </span>
+          <span class="row-go" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+                 stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h12.5M12.5 6.5 18 12l-5.5 5.5" />
+            </svg>
+          </span>
+        </a>
+
+        <p class="choices-note">两者标准不同、互不影响，进入后可随时返回封面</p>
+      </nav>
+    </section>
+
+    <footer class="cover-foot">
+      <span>ReSTAgent <b>v0.3</b></span>
+      <span class="foot-mid">仅本机运行<span class="dot">·</span>数据不外传</span>
+      <span class="foot-end"><i class="sig-dot" aria-hidden="true"></i>Signal&nbsp;Ready</span>
+    </footer>
+
+  </div>
+</div>
+
+<script src="/static/brandmark.js"></script>
+<script src="/static/cover.js"></script>
+</body>
+</html>
