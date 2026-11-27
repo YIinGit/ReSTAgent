@@ -36,6 +36,10 @@ SKIP_DIRS = {"__pycache__", ".pytest_cache", ".git"}
 SKIP_SUFFIX = {".pyc", ".pyo"}
 # 敏感/生成文件：绝不进发行包
 # 内部材料：不进发行包、不进仓库
+# docs 下只随包分发使用说明；UI 试验材料与内部审查报告不进发行包
+RELEASE_SKIP_DOCS = {"UI重构方案.md", "封面与流水线方案.md", "cover_mockup.png",
+                     "代码审查报告.md", "proto"}
+
 IGNORE_EXTRA = {"2026活动部教案-给AI的版本.docx", "AI评审提示词.md"}
 
 SKIP_FILES = {"config.json", "layout_rules.json",
@@ -48,6 +52,8 @@ def copytree(src: pathlib.Path, dst: pathlib.Path) -> int:
         if any(part in SKIP_DIRS for part in p.parts):
             continue
         if p.suffix.lower() in SKIP_SUFFIX or p.name in SKIP_FILES:
+            continue
+        if src.name == "docs" and any(part in RELEASE_SKIP_DOCS for part in p.relative_to(src).parts):
             continue
         target = dst / p.relative_to(src)
         if p.is_dir():
