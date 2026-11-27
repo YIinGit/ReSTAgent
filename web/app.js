@@ -1099,9 +1099,12 @@ function bind() {
     if (!b) return;
     state.stage = b.dataset.stage;
     $$(".stage").forEach((x) => x.classList.toggle("is-active", x === b));
-    const desc = document.querySelector(`.stage[data-stage="${state.stage}"] .stage-desc`);
     state.stageDesc = STAGE_DESC[state.stage] || "";
     setText("#stageDetail", state.stageDesc || STAGE_DESC.second);
+    if (state.stage !== "third") {
+      // 从三审切回文稿环节：恢复稿件状态文案与按钮可用性
+      renderFiles();
+    }
     updateEstimate();
   });
   $("#levelList").addEventListener("click", (e) => {
