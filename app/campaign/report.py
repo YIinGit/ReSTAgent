@@ -43,7 +43,9 @@ def to_markdown(res: dict, title: str = "策划案初审意见") -> str:
         lines.append("")
         for f in items:
             where = ("第 %d 段" % f["paragraph"]) if f.get("paragraph", -1) >= 0 else "全文"
-            lines.append("### %s%s" % ("%s · " % f["rule"] if f.get("rule") else "", where))
+            st = f.get("status") or "pending"
+            mark = {"accepted": "（已接受）", "rejected": "（已忽略）"}.get(st, "")
+            lines.append("### %s%s%s" % ("%s · " % f["rule"] if f.get("rule") else "", where, mark))
             if f.get("anchor"):
                 lines.append("> %s" % f["anchor"])
             lines.append("")

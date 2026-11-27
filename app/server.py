@@ -318,6 +318,11 @@ class Handler(BaseHTTPRequestHandler):
                     cjob = camp_mod.CAMP.get(cid)
                 except KeyError:
                     return self._error("初审任务不存在或已过期", 404)
+                if len(parts) > 3 and parts[3] == "decide":
+                    body = self._json_body()
+                    n = camp_mod.CAMP.decide(cjob, body.get("ids") or [],
+                                             body.get("status") or "pending")
+                    return self._json({"changed": n, "job": cjob.to_dict(full=True)})
                 if len(parts) > 3 and parts[3] == "docx":
                     return self._camp_file(cjob, "docx")
                 if len(parts) > 3 and parts[3] == "report":

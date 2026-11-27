@@ -135,11 +135,34 @@ class CampManager:
             job.add_log("初审失败：%s" % e, level="error", pct=100)
 
     # ---------- 导出 ----------
+    def decide(self, job: CampJob, ids: list[str], status: str) -> int:
+        """逐条接受 / 忽略 / 还原。status: accepted | rejected | pending"""
+        if status not in ("accepted", "rejected", "pending"):
+            raise ValueError("未知状态：%s" % status)
+        res = job.result or {}
+        findings = res.get("findings") or []
+        want = set(ids or [])
+        n = 0
+        with job.lock:
+            for f in findings:
+                if want and f.get("id") not in want:
+                    continue
+                if not want:                     # 空表示全部
+                    f["status"] = status
+                    n += 1
+                elif f.get("id") in want:
+                    f["status"] = status
+                    n += 1
+        return n
+
     def export_docx(self, job: CampJob) -> pathlib.Path:
         if not job.result:
             raise ValueError("还没有初审结果")
         out = job.dir / (pathlib.Path(job.name).stem + "_初审批注版.docx")
-        comments = report_mod.comments_for_word(job.result)
+        res = dict(job.result or {})
+        res["findings"] = [f for f in (res.get("findings") or [])
+                           if f.get("status") != "rejected"]
+        comments = report_mod.comments_for_word(res)
         annotate_mod.export_comments_only(job.source, str(out), comments)
         return out
 

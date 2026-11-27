@@ -155,3 +155,15 @@ body.camp-body{
 @media (prefers-reduced-motion: reduce){
   *{animation:none !important;transition:none !important}
 }
+
+/* ---------- 逐条处理（接受 / 忽略 / 还原） ---------- */
+.camp-bulk{display:flex;gap:8px;margin:0 0 14px}
+.camp-status{
+  display:inline-block;margin-left:8px;font:600 var(--t-xs)/1 var(--font-mono);
+  padding:2px 7px;border-radius:var(--r-full);
+}
+.camp-status.accepted{background:var(--ok-soft);color:var(--ok);border:1px solid var(--ok-line)}
+.camp-status.rejected{background:var(--bg-3);color:var(--ink-3);border:1px solid var(--line)}
+.camp-acts{display:flex;align-items:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+.camp-acts-hint{font-size:var(--t-xs);color:var(--ink-3);margin-left:auto}
+.camp-card.rejected{opacity:.55}

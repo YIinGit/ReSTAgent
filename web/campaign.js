@@ -141,7 +141,7 @@
             "<span class='tag'>缺 " + esc(m) + "</span>").join("") + "</p>"
         : "");
 
-    $("#campCounts").textContent = "共 " + fs.length + " 条 · 必改 " + must + " · 建议 " + sug;
+    updateCounts(fs);
     $("#btnCampDocx").href = "/api/campaign/" + state.jobId + "/docx";
     $("#btnCampMd").href = "/api/campaign/" + state.jobId + "/report";
 
@@ -164,13 +164,18 @@
         html += '<div class="camp-group">' + (LEVEL[f.level] || f.level) + "</div>";
         last = f.level;
       }
-      const active = state.sel === i ? " is-active" : "";
+      const active = (state.sel === i ? " is-active" : "") +
+        ((f.status || "pending") === "rejected" ? " rejected" : "");
       const where = f.paragraph >= 0 ? ("第 " + (f.paragraph + 1) + " 段") : "全文";
+      const st = f.status || "pending";
+      const stMark = st === "accepted" ? "✓ 已接受" : st === "rejected" ? "× 已忽略" : "";
       html += '<div class="camp-card' + active + '" data-i="' + i + '">' +
         '<div class="camp-card-top"><span class="camp-badge ' + esc(f.level) + '">' +
         (LEVEL[f.level] || f.level) + "</span><span>" + esc(f.rule || "") +
         "</span><span style='margin-left:auto'>" + esc(where) + "</span></div>" +
-        '<div class="camp-card-problem">' + esc(f.problem || "") + "</div></div>";
+        '<div class="camp-card-problem">' + esc(f.problem || "") +
+        (stMark ? '<span class="camp-status ' + st + '">' + stMark + "</span>" : "") +
+        "</div></div>";
     });
     box.innerHTML = html;
     box._findings = fs;
@@ -195,7 +200,48 @@
       rows.push("<div class='camp-block'><div class='k'>教案依据</div><div class='v'>" +
         esc(f.basis) + "</div></div>");
     }
+    const st = f.status || "pending";
+    rows.push('<div class="camp-acts">' +
+      '<button class="btn btn-primary btn-mini" data-act="accepted">接受</button>' +
+      '<button class="btn btn-ghost btn-mini" data-act="rejected">忽略</button>' +
+      (st !== "pending" ? '<button class="btn btn-ghost btn-mini" data-act="pending">还原</button>' : "") +
+      '<span class="camp-acts-hint">' +
+      (st === "accepted" ? "已接受：会写进批注版 Word" : st === "rejected" ? "已忽略：不写进 Word" : "待处理") +
+      "</span></div>");
     $("#campDetail").innerHTML = rows.join("");
+  }
+
+  async function decideCamp(ids, status) {
+    try {
+      const res = await fetch("/api/campaign/" + state.jobId + "/decide", {
+        method: "POST",
+        headers: Object.assign({ "Content-Type": "application/json" },
+          (function () {
+            try { const tk = sessionStorage.getItem("ra_token"); return tk ? { "X-Auth-Token": tk } : {}; }
+            catch (e) { return {}; }
+          })()),
+        body: JSON.stringify({ ids: ids, status: status }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "操作失败");
+      state.job = data.job;
+      const r = state.job.result || {};
+      const fs = r.findings || [];
+      renderList(fs);
+      if (state.sel !== null && fs[state.sel]) renderDetail(state.sel);
+      updateCounts(fs);
+    } catch (e) {
+      alert("操作失败：" + e.message);
+    }
+  }
+
+  function updateCounts(fs) {
+    const must = fs.filter((f) => f.level === "must").length;
+    const sug = fs.length - must;
+    const done = fs.filter((f) => (f.status || "pending") !== "pending").length;
+    const el = $("#campCounts");
+    if (el) el.textContent = "共 " + fs.length + " 条 · 必改 " + must +
+      " · 建议 " + sug + " · 已处理 " + done;
   }
 
   /* ---------- 事件 ---------- */
@@ -230,6 +276,28 @@
       state.sel = Number(card.dataset.i);
       $$("#campList .camp-card").forEach((c) => c.classList.toggle("is-active", c === card));
       renderDetail(state.sel);
+    });
+
+    $("#campDetail").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-act]");
+      if (!b || state.sel === null) return;
+      const fs = ((state.job || {}).result || {}).findings || [];
+      const f = fs[state.sel];
+      if (!f) return;
+      decideCamp([f.id], b.dataset.act);
+    });
+
+    $("#btnCampAcceptMust")?.addEventListener("click", () => {
+      const fs = ((state.job || {}).result || {}).findings || [];
+      decideCamp(fs.filter((x) => x.level === "must").map((x) => x.id), "accepted");
+    });
+    $("#btnCampRejectSuggest")?.addEventListener("click", () => {
+      const fs = ((state.job || {}).result || {}).findings || [];
+      decideCamp(fs.filter((x) => x.level === "suggest").map((x) => x.id), "rejected");
+    });
+    $("#btnCampReset")?.addEventListener("click", () => {
+      const fs = ((state.job || {}).result || {}).findings || [];
+      decideCamp(fs.map((x) => x.id), "pending");
     });
 
     $("#btnCampNew").addEventListener("click", () => {
