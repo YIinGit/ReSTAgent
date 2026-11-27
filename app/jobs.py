@@ -175,7 +175,8 @@ class Manager:
         return doc
 
     # ---------- 任务 ----------
-    def create_job(self, file_ids: list[str], stage: str, level: str) -> Job:
+    def create_job(self, file_ids: list[str], stage: str, level: str,
+                   mechanic: bool = False) -> Job:
         if stage not in ("zero", "first", "second", "third"):
             raise ValueError("未知审稿环节")
         if level not in ("light", "standard", "strict", "max"):
@@ -188,7 +189,14 @@ class Manager:
             files.append(info)
         if not files:
             raise ValueError("请先选择稿件")
-        job = Job(files, stage, level, self.cfg)
+        cfg = self.cfg
+        if mechanic:
+            # 机械审查：只用本地规则预检，完全不调用模型（省钱/离线可用）
+            import copy as _copy
+            cfg = _copy.deepcopy(self.cfg)
+            cfg.setdefault("debug", {})["mock"] = True
+        job = Job(files, stage, level, cfg)
+        job.mechanic = bool(mechanic)
         with self.lock:
             self.jobs[job.id] = job
         job.exports = {}

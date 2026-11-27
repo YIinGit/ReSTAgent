@@ -22,6 +22,22 @@
     }
   } catch (e) { /* 字标失败不影响进入 */ }
 
+  /* ---------- 深浅色 ---------- */
+  var THEME_KEY = "restagent.theme";
+  var btn = document.getElementById("btnCoverTheme");
+  var label = document.getElementById("coverThemeLabel");
+  function applyTheme(theme, persist) {
+    document.documentElement.dataset.theme = theme;
+    if (label) label.textContent = theme === "dark" ? "浅色" : "深色";
+    if (persist) { try { localStorage.setItem(THEME_KEY, theme); } catch (e) { } }
+  }
+  var saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) { saved = null; }
+  applyTheme(saved === "light" ? "light" : "dark", false);
+  btn?.addEventListener("click", function () {
+    applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true);
+  });
+
   /* ---------- 光晕跟随 ---------- */
   var raf = 0;
   cover.addEventListener("pointermove", function (e) {

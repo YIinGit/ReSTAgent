@@ -258,6 +258,14 @@ async function uploadFiles(fileList) {
 }
 
 async function updateEstimate() {
+  const mech = !!(document.querySelector("#chkMechanic") || {}).checked;
+  if (mech) {
+    setText("#estCalls", "0 次");
+    setText("#estIn", "不调用模型");
+    setText("#estOut", "—");
+    setText("#estCost", "¥0");
+    return;
+  }
   const ok = state.files.filter((f) => !f.error);
   const chars = ok.reduce((a, f) => a + f.chars, 0);
   if (!chars) {
@@ -283,7 +291,10 @@ async function startReview() {
   try {
     const job = await api("/api/jobs", {
       method: "POST",
-      body: { file_ids: ok.map((f) => f.file_id), stage: state.stage, level: state.level },
+      body: {
+        file_ids: ok.map((f) => f.file_id), stage: state.stage, level: state.level,
+        mechanic: !!(document.querySelector("#chkMechanic") || {}).checked,
+      },
     });
     state.job = job; state.jobId = job.id; state.curFile = null; state.sel = null;
     showView("Running");
@@ -1101,6 +1112,13 @@ function bind() {
     updateEstimate();
   });
 
+  document.querySelector("#chkMechanic")?.addEventListener("change", () => {
+    const on = document.querySelector("#chkMechanic").checked;
+    setText("#startInfo", on
+      ? "机械审查：只用本地规则，不调用模型，零成本"
+      : (state.files.filter((f) => !f.error).length ? "可以开始审稿" : "请先放入稿件"));
+    updateEstimate();
+  });
   $("#btnStart").addEventListener("click", startReview);
   $("#btnDemo").addEventListener("click", loadDemo);
   $("#btnCancel").addEventListener("click", async () => {
@@ -1274,6 +1292,8 @@ function bind() {
   loadHistory();
   bindRecent();
   loadConfig().then(() => {
-    if (new URLSearchParams(location.search).get("demo") === "1") loadDemo();
+    const q = new URLSearchParams(location.search);
+    if (q.get("demo") === "1") loadDemo();
+    if (q.get("settings") === "1") openDrawer();
   });
 })();

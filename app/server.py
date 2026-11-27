@@ -251,14 +251,20 @@ class Handler(BaseHTTPRequestHandler):
                 HITS["n"] += 1
                 q = urllib.parse.parse_qs(parsed.query)
                 extra = {}
-                if (q.get("t") or [""])[0] and secrets.compare_digest((q["t"][0]), SESSION_TOKEN):
+                asked = (q.get("t") or [""])[0]
+                # 只对本机来源下发；?t= 正确或首次访问都发，避免手动打开时各处 401
+                if _host_ok(self.headers.get("Host") or "") and (
+                        not asked or secrets.compare_digest(asked, SESSION_TOKEN)):
                     extra["Set-Cookie"] = "ra_token=%s; Path=/; SameSite=Strict" % SESSION_TOKEN
                 return self._static("cover.html", extra=extra)
             if path in ("/app", "/app.html"):
                 # 工作台：编辑部的零/一/二/三审
                 q = urllib.parse.parse_qs(parsed.query)
                 extra = {}
-                if (q.get("t") or [""])[0] and secrets.compare_digest((q["t"][0]), SESSION_TOKEN):
+                asked = (q.get("t") or [""])[0]
+                # 只对本机来源下发；?t= 正确或首次访问都发，避免手动打开时各处 401
+                if _host_ok(self.headers.get("Host") or "") and (
+                        not asked or secrets.compare_digest(asked, SESSION_TOKEN)):
                     extra["Set-Cookie"] = "ra_token=%s; Path=/; SameSite=Strict" % SESSION_TOKEN
                 return self._static("index.html", extra=extra)
             if path in ("/campaign", "/campaign.html"):
@@ -381,7 +387,8 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/jobs":
                 body = self._json_body()
                 job = MANAGER.create_job(body.get("file_ids") or [], body.get("stage") or "second",
-                                         body.get("level") or "standard")
+                                         body.get("level") or "standard",
+                                         mechanic=bool(body.get("mechanic")))
                 return self._json(job.to_dict())
             if path.startswith("/api/jobs/"):
                 parts = path.strip("/").split("/")
@@ -855,7 +862,8 @@ def main(argv=None):
     global LOG_REQUESTS
     LOG_REQUESTS = args.log
     port = pick_port(args.port)
-    url = "http://127.0.0.1:%d" % port
+    base = "http://127.0.0.1:%d" % port
+    url = base + "/?t=" + urllib.parse.quote(SESSION_TOKEN)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     httpd.daemon_threads = True
     print("%s v%s 已启动：%s" % (APP_NAME, APP_VERSION, url))

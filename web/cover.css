@@ -399,3 +399,53 @@ body{
   .sig-dot{ animation:none; opacity:.8; }
   .cover.is-leaving{ filter:none; transform:none; }
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   浅色主题：同一套版式，换成「纸 + 墨」的质感。
+   只覆盖颜色变量与少量叠层强度，不动布局与动效。
+   ════════════════════════════════════════════════════════════════════════ */
+[data-theme="light"]{
+  --bg:        #F7F5F1;
+  --ink-1:     #14181C;
+  --ink-2:     #5A6470;
+  --ink-3:     #8B95A1;
+  --line:      rgba(0,0,0,.10);
+  --line-2:    rgba(0,0,0,.22);
+  --signal:    #0E8C74;
+  --signal-dim:rgba(14,140,116,.5);
+}
+[data-theme="light"] .cover{
+  background:radial-gradient(130% 85% at 6% -14%, #FFFFFF 0%, transparent 55%), var(--bg);
+}
+[data-theme="light"] .atmos-light{
+  background:radial-gradient(46vmax 46vmax at var(--mx,18%) var(--my,28%),
+             rgba(14,140,116,.07) 0%, rgba(14,140,116,.02) 40%, transparent 68%);
+}
+[data-theme="light"] .atmos-grain{opacity:.03}
+[data-theme="light"] .cover::after{
+  background:radial-gradient(128% 96% at 46% 44%, transparent 62%, rgba(0,0,0,.06) 100%);
+}
+[data-theme="light"] .reg{border-color:rgba(0,0,0,.25)}
+[data-theme="light"] .row:hover{background:rgba(14,140,116,.05)}
+
+/* 封面右上角：深浅色切换 */
+.cover-theme{
+  position:absolute;top:20px;right:56px;z-index:6;
+  display:inline-flex;align-items:center;gap:6px;
+  height:30px;padding:0 12px;border-radius:var(--r-full);
+  border:1px solid var(--line-2);background:transparent;color:var(--ink-3);
+  font:12px/1 var(--font-sans);cursor:pointer;
+  transition:color .2s var(--e-soft),border-color .2s var(--e-soft);
+}
+.cover-theme:hover{color:var(--signal);border-color:var(--signal-dim)}
+
+/* 封面右上角：设置入口 */
+.cover-tools{
+  position:absolute;top:20px;right:150px;z-index:6;
+  display:inline-flex;align-items:center;gap:6px;
+  height:30px;padding:0 12px;border-radius:var(--r-full);
+  border:1px solid var(--line-2);color:var(--ink-3);text-decoration:none;
+  font:12px/1 var(--font-sans);cursor:pointer;
+  transition:color .2s var(--e-soft),border-color .2s var(--e-soft);
+}
+.cover-tools:hover{color:var(--signal);border-color:var(--signal-dim)}
