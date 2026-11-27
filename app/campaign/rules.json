@@ -1,0 +1,174 @@
+{
+  "version": "1.0",
+  "source": "《2026活动部教案》第四讲至第九讲",
+  "updated": "2026-11-27",
+  "verdict_rules": {
+    "pass": "must == 0",
+    "return": "缺少 2 个及以上核心板块，或流程、危机预案整体缺失",
+    "revise": "其余情况"
+  },
+  "core_sections": ["综述", "流程", "人员", "目标", "危机预案"],
+  "limits": {"must": 12, "suggest": 8},
+  "rules": [
+    {
+      "id": "R01",
+      "name": "目标可衡量",
+      "dimension": "目标明确",
+      "basis": "第四讲·策划评判的核心标准 1（目标明确：具体可衡量）；第五讲·SMART 的 Measurable",
+      "check": "目标是否有对象、数量、时间；出现「更多／更好／圆满／丰富」而无数量指标即不达标",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R02",
+      "name": "目标与类型匹配",
+      "dimension": "目标明确",
+      "basis": "第四讲·材料：活动类型（商业推广／文化娱乐／公益慈善／集体内部／科普知识）",
+      "check": "目的、对象、形式是否与五类活动之一一致",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R03",
+      "name": "时间地点明确",
+      "dimension": "可行性",
+      "basis": "第四讲·核心标准 2（可行性强：时间、场地）；第七讲（二）活动流程「清楚」",
+      "check": "是否有具体日期与时段、具体场地；「待定」必须有确定节点与责任人，否则判缺",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R04",
+      "name": "流程闭环",
+      "dimension": "流程合理",
+      "basis": "第七讲（二）活动流程 1「完整：预热、准备、正式进行、后续收尾」",
+      "check": "四阶段是否齐全；缺两个及以上阶段判 must，缺一个判 suggest",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R05",
+      "name": "流程时间节点",
+      "dimension": "流程合理",
+      "basis": "第七讲（二）2「各部分的时间明确」；第六讲·时间轴倒推法 Step3/Step4",
+      "check": "每个环节是否有起止时间或时长；关键节点是否标注",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R06",
+      "name": "责任人到岗",
+      "dimension": "可行性",
+      "basis": "第五讲（一）人力 第 2、5 条（明确职责、明确负责人与沟通渠道）",
+      "check": "岗位是否对应到人；以「全体／大家／相关人员」作责任主体判不达标",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R07",
+      "name": "预期目标 SMART",
+      "dimension": "目标明确",
+      "basis": "第五讲·SMART 原则（具体、可衡量、可实现、相关、有时限）",
+      "check": "是否有 2—4 条可核查指标，含数量与时限",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R08",
+      "name": "风险预案可执行",
+      "dimension": "风险可控",
+      "basis": "第四讲·核心标准 5（预测风险、措施切实可行、措施本身不引入新风险）；第七讲·危机预案为必备板块",
+      "check": "须含风险项、触发条件、应对动作、责任人、备用资源；「加强管理／及时处理／听从安排」等空话判不可执行",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R09",
+      "name": "板块齐全",
+      "dimension": "体例",
+      "basis": "第七讲（一）组成部分：活动综述（或目的）、活动流程、人员安排、预期目标、危机预案；比赛类另加奖励办法、对接工作、参赛要求",
+      "check": "五个核心板块是否齐全；比赛类是否补充三项",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R10",
+      "name": "人力配置",
+      "dimension": "可行性",
+      "basis": "第五讲（一）人力 1—6（数量、技能、分工、协作、培训、沟通渠道）",
+      "check": "是否说明人员数量、分工、协作方式与沟通渠道",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R11",
+      "name": "物资与预算",
+      "dimension": "可行性",
+      "basis": "第五讲（二）物力 1—2（名称／规格／数量／来源，采购借用需提前对接）",
+      "check": "是否有物资清单与金额、经费来源",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R12",
+      "name": "场地与对接",
+      "dimension": "可行性",
+      "basis": "第五讲（三）地力；第七讲·向学校对接需写明配合部分",
+      "check": "场地、时段、申请部门、提交时间、需校方配合事项是否写明",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R13",
+      "name": "宣传动员",
+      "dimension": "创新与动员",
+      "basis": "第五讲（一）人力·预热阶段需海报、广播宣传；第七讲 Eg8·电子班牌预热",
+      "check": "渠道、时间、物料、责任人是否明确",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R14",
+      "name": "语言客观",
+      "dimension": "语言规范",
+      "basis": "第七讲·二、语言规范及注意事项",
+      "check": "是否出现主观评价（很好／精彩／糟糕）或绝对化承诺（一定／保证／必然）",
+      "level_when_missing": "must"
+    },
+    {
+      "id": "R15",
+      "name": "口语规范",
+      "dimension": "语言规范",
+      "basis": "第七讲·二、考虑维度 1 受众（协内自用可口语；上报／对外需书面化）",
+      "check": "仅当文本用于上报学校或对外宣传时判；协内自用不判",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R16",
+      "name": "创新互动",
+      "dimension": "创新与动员",
+      "basis": "第四讲·核心标准 3（创新性：形式、内容、互动方式）；第九讲·创意孵化",
+      "check": "是否有动手、协作或产出环节，而非纯观看",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R17",
+      "name": "需求依据",
+      "dimension": "目标明确",
+      "basis": "第四讲·二、需求分析四步法（记录原始需求、追问使用场景、定位核心问题、转化可执行指标）",
+      "check": "是否说明需求来源、目标人群与核心问题",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R18",
+      "name": "缓冲时间",
+      "dimension": "流程合理",
+      "basis": "第六讲·Step3「预留一定的缓冲时间」；第七讲（二）3「预留充分的缓冲时间」",
+      "check": "关键环节前是否预留 5—10 分钟并注明用途",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R19",
+      "name": "收尾复盘",
+      "dimension": "流程合理",
+      "basis": "第八讲·多维评估；第七讲（二）1 后续收尾；第五讲（二）4 物资回收",
+      "check": "清场、物资归还、数据统计、结果发布、复盘的时间与责任人",
+      "level_when_missing": "suggest"
+    },
+    {
+      "id": "R20",
+      "name": "体例",
+      "dimension": "体例",
+      "basis": "第七讲（二）「通常，活动流程以表格的形式呈现」；第七讲·DDL 要求编号连续",
+      "check": "编号是否连续、流程是否用表格、单位是否统一（时长少于一天的活动不因未用表格判 must）",
+      "level_when_missing": "suggest"
+    }
+  ]
+}
