@@ -2,9 +2,9 @@
 
 不算程序（exe），只复制运行需要的文件，用户装了 Python 3.10+ 就能直接双击启动。
 
-输出布局（默认 release/ReSTAgent_v0.3/）：
+输出布局（默认 release/ReSTAgent_v1.0/）：
 
-    ReSTAgent_v0.3/
+    ReSTAgent_v1.0/
       ReSTAgent.bat        双击启动（自动找 Python，无窗口）
       ReSTAgent.pyw        直接启动入口
       README.md            使用说明
@@ -27,7 +27,7 @@ import shutil
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-VERSION = sys.argv[1] if len(sys.argv) > 1 else "0.2"
+VERSION = sys.argv[1] if len(sys.argv) > 1 else "1.0"
 OUT = ROOT / "release" / ("ReSTAgent_v%s" % VERSION)
 
 COPY_TREES = ["app", "web", "vendor", "docs"]

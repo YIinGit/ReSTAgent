@@ -26,7 +26,7 @@ def main() -> int:
   <div class="brand">
     <div class="logo">R</div>
     <div>
-      <h1>ReSTAgent <span id="appVersion" class="ver">v0.3</span></h1>
+      <h1>ReSTAgent <span id="appVersion" class="ver">v1.0</span></h1>
       <p class="tagline">本机运行 · 数据不外传</p>
     </div>
   </div>
