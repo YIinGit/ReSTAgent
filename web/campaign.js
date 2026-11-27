@@ -56,7 +56,12 @@
     fd.append("kind", $("#campKind").value || "");
     fd.append("submission", $("#campSubmission").value || "协内自用");
     try {
-      const res = await fetch("/api/campaign", { method: "POST", body: fd });
+      const tk = (function () {
+        try { return sessionStorage.getItem("ra_token") || new URLSearchParams(location.search).get("t") || ""; }
+        catch (e) { return ""; }
+      })();
+      const res = await fetch("/api/campaign", { method: "POST", body: fd,
+        headers: tk ? { "X-Auth-Token": tk } : {} });
       let job = {};
       try { job = await res.json(); } catch (e) { job = { error: "服务返回异常" }; }
       if (!res.ok) throw new Error(job.error || ("HTTP " + res.status));
@@ -76,7 +81,7 @@
     state.poll = setInterval(async () => {
       if (!state.jobId) return;
       try {
-        const res = await fetch("/api/campaign/" + state.jobId);
+        const res = await fetch("/api/campaign/" + state.jobId, { headers: (function(){try{const tk=sessionStorage.getItem("ra_token")||"";return tk?{"X-Auth-Token":tk}:{};}catch(e){return {};}})() });
         const job = await res.json();
         if (!res.ok) throw new Error(job.error || "读取失败");
         state.job = job;
@@ -118,7 +123,7 @@
 
   /* ---------- 结果 ---------- */
   async function renderResult() {
-    const res = await fetch("/api/campaign/" + state.jobId);
+    const res = await fetch("/api/campaign/" + state.jobId, { headers: (function(){try{const tk=sessionStorage.getItem("ra_token")||"";return tk?{"X-Auth-Token":tk}:{};}catch(e){return {};}})() });
     const job = await res.json();
     state.job = job;
     const r = job.result || {};

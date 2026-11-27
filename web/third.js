@@ -58,7 +58,12 @@
     if (start) start.disabled = true;
     try {
       toast("正在上传并开始三审…");
-      const res = await fetch("/api/third?vision=" + vision + "&per_sheet=2", { method: "POST", body: fd });
+      const tk = (function () {
+        try { return sessionStorage.getItem("ra_token") || new URLSearchParams(location.search).get("t") || ""; }
+        catch (e) { return ""; }
+      })();
+      const res = await fetch("/api/third?vision=" + vision + "&per_sheet=2",
+        { method: "POST", body: fd, headers: tk ? { "X-Auth-Token": tk } : {} });
       let job = {};
       try { job = await res.json(); } catch (e) { job = { error: "服务返回异常" }; }
       if (!res.ok) throw new Error(job.error || ("HTTP " + res.status));

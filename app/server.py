@@ -4,7 +4,9 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import pathlib
+import secrets
 import socket
 import sys
 import threading
@@ -55,6 +57,47 @@ MAX_UPLOAD = 320 * 1024 * 1024   # 三审的 PDF 常超过 50MB
 LOG_REQUESTS = False
 HITS = {"n": 0}   # 首页被请求的次数，桌面启动器用它判断窗口是否真的起来了
 ADMIN_TOKENS: set[str] = set()   # 管理员登录后颁发的一次性令牌（重启即失效）
+
+# ---------------------------------------------------------------- 安全（见 docs/代码审查报告.md）
+# 「监听 127.0.0.1」不等于安全：任何网页都能向本机端口发请求（DNS rebinding / CSRF）。
+# 三重防线：
+#   1. Host 白名单      → 挡住 DNS rebinding（攻击域名解析到 127.0.0.1）
+#   2. Origin 白名单    → 挡住其它站点发起的跨站请求
+#   3. 会话令牌         → 连本机其它程序也挡得住
+ALLOWED_HOSTS = {"127.0.0.1", "localhost", "::1"}
+SESSION_TOKEN = os.environ.get("RESTAGENT_TOKEN") or secrets.token_urlsafe(32)
+# 测试用：设 RESTAGENT_INSECURE=1 可关闭来源校验（仅限本机自动化测试）
+ALLOW_ANY_ORIGIN = os.environ.get("RESTAGENT_INSECURE") == "1"
+LOGIN_FAILS: dict[str, list[float]] = {}     # 来源 IP → 失败时间戳，用于限速
+LOGIN_MAX_FAILS = 5
+LOGIN_WINDOW = 300.0
+
+
+def new_session_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def _host_ok(host_header: str) -> bool:
+    """Host 头必须是本机地址；为空也放行（某些客户端不发 Host）。"""
+    host = (host_header or "").strip()
+    if not host:
+        return True
+    if host.startswith("["):                    # IPv6: [::1]:5731
+        host = host[1:].split("]", 1)[0]
+    else:
+        host = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+    return host in ALLOWED_HOSTS
+
+
+def _origin_ok(origin: str) -> bool:
+    """浏览器跨站请求必带 Origin；只允许本机来源。"""
+    if not origin:
+        return True
+    try:
+        host = urllib.parse.urlsplit(origin).hostname or ""
+    except ValueError:
+        return False
+    return host in ALLOWED_HOSTS
 
 
 def parse_multipart(body: bytes, boundary: bytes):
@@ -122,11 +165,65 @@ class Handler(BaseHTTPRequestHandler):
     def _error(self, msg, status=400):
         self._json({"error": str(msg)}, status)
 
+    # ---------- 安全检查 ----------
+    def _token_ok(self) -> bool:
+        """令牌可放 query（?t=）或头（X-Auth-Token）；首页本身可带 token 换取 cookie。"""
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        token = (q.get("t") or [""])[0] or self.headers.get("X-Auth-Token") or ""
+        if secrets.compare_digest(token, SESSION_TOKEN):
+            return True
+        cookie = self.headers.get("Cookie") or ""
+        for part in cookie.split(";"):
+            k, _, v = part.strip().partition("=")
+            if k == "ra_token" and secrets.compare_digest(v, SESSION_TOKEN):
+                return True
+        return False
+
+    def _guard(self, path: str) -> bool:
+        """返回 True 表示可以继续处理；否则已写好响应。"""
+        if ALLOW_ANY_ORIGIN:
+            return True
+        if not _host_ok(self.headers.get("Host") or ""):
+            self._error("来源不被允许（Host 校验失败）", 403)
+            return False
+        if not _origin_ok(self.headers.get("Origin") or ""):
+            self._error("来源不被允许（Origin 校验失败）", 403)
+            return False
+        if path.startswith("/api/") and not self._token_ok():
+            self._json({"error": "缺少或错误的访问令牌", "need_token": True}, 401)
+            return False
+        if self.command == "POST" and path.startswith("/api/"):
+            # 只收 JSON / multipart；text/plain 等属于 CORS 简单请求，可绕过预检
+            ctype = (self.headers.get("Content-Type") or "").lower()
+            if ctype and not (ctype.startswith("application/json")
+                              or ctype.startswith("multipart/form-data")):
+                self._error("只接受 application/json 或 multipart/form-data", 415)
+                return False
+        return True
+
     def _body(self) -> bytes:
         n = int(self.headers.get("Content-Length") or 0)
         if n > MAX_UPLOAD:
             raise ValueError("文件过大")
-        return self.rfile.read(n) if n else b""
+        data = self.rfile.read(n) if n else b""
+        self._body_read = getattr(self, "_body_read", 0) + len(data)
+        return data
+
+    def _drain(self):
+        """把没读完的请求体丢掉，否则 HTTP/1.1 长连接上的下一个请求会被噎死。"""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return
+        left = n - getattr(self, "_body_read", 0)
+        try:
+            while left > 0:
+                chunk = self.rfile.read(min(left, 65536))
+                if not chunk:
+                    break
+                left -= len(chunk)
+        except Exception:  # noqa: BLE001
+            pass
 
     def _json_body(self) -> dict:
         raw = self._body()
@@ -138,17 +235,31 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("请求体不是合法 JSON")
 
     # ---------- 路由 ----------
+    def _finish(self):
+        try:
+            self._drain()
+        finally:
+            self._body_read = 0
+
     def do_GET(self):
+        self._body_read = 0
         try:
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
             if path in ("/", "/index.html"):
                 HITS["n"] += 1
-                return self._static("index.html")
+                # 带 ?t=token 访问首页时下发 cookie，后续静态与接口请求都不用再带参数
+                q = urllib.parse.parse_qs(parsed.query)
+                extra = {}
+                if (q.get("t") or [""])[0] and secrets.compare_digest((q["t"][0]), SESSION_TOKEN):
+                    extra["Set-Cookie"] = "ra_token=%s; Path=/; SameSite=Strict" % SESSION_TOKEN
+                return self._static("index.html", extra=extra)
             if path in ("/campaign", "/campaign.html"):
                 return self._static("campaign.html")
             if path.startswith("/static/"):
                 return self._static(path[len("/static/"):])
+            if not self._guard(path):
+                return None
             if path == "/api/config":
                 return self._json(config_mod.masked(config_mod.load()))
             if path == "/api/health":
@@ -212,11 +323,16 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             return self._error(e, 500)
+        finally:
+            self._finish()
 
     def do_POST(self):
+        self._body_read = 0
         try:
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
+            if not self._guard(path):
+                return None
             if path == "/api/upload":
                 return self._upload()
             if path == "/api/third":
@@ -297,11 +413,16 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             return self._error(e, 500)
+        finally:
+            self._finish()
 
     def do_DELETE(self):
+        self._body_read = 0
         try:
             parsed = urllib.parse.urlparse(self.path)
             path = parsed.path
+            if not self._guard(path):
+                return None
             if path.startswith("/api/history/"):
                 job_id = urllib.parse.unquote(path[len("/api/history/"):].strip("/"))
                 if not job_id:
@@ -314,6 +435,8 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
             return self._error(e, 500)
+        finally:
+            self._finish()
 
     # ---------- 具体处理 ----------
     def _health(self) -> dict:
@@ -406,15 +529,35 @@ class Handler(BaseHTTPRequestHandler):
         token = self.headers.get("X-Admin-Token") or ""
         return bool(token) and token in ADMIN_TOKENS
 
+    def _login_locked(self, ip: str) -> bool:
+        now = time.time()
+        hits = [t for t in LOGIN_FAILS.get(ip, []) if now - t < LOGIN_WINDOW]
+        LOGIN_FAILS[ip] = hits
+        return len(hits) >= LOGIN_MAX_FAILS
+
+    def _login_failed(self, ip: str):
+        LOGIN_FAILS.setdefault(ip, []).append(time.time())
+
     def _admin(self, action: str):
         if action == "login":
+            ip = self.client_address[0] if self.client_address else "?"
+            if self._login_locked(ip):
+                return self._json(
+                    {"ok": False, "error": "密码错误次数过多，请 %.0f 分钟后再试" % (LOGIN_WINDOW / 60)},
+                    429)
             body = self._json_body()
             cfg = config_mod.load()
             if not admin_mod.verify(cfg, str(body.get("password") or "")):
+                self._login_failed(ip)
                 return self._json({"ok": False, "error": "密码不正确"}, 401)
+            LOGIN_FAILS.pop(ip, None)
             token = uuid.uuid4().hex
             ADMIN_TOKENS.add(token)
             return self._json({"ok": True, "token": token})
+        if action == "logout":
+            tok = self.headers.get("X-Admin-Token") or ""
+            ADMIN_TOKENS.discard(tok)
+            return self._json({"ok": True})
         if not self._admin_ok():
             return self._error("需要管理员登录", 401)
         if action == "state":
@@ -493,7 +636,7 @@ class Handler(BaseHTTPRequestHandler):
             pass
         return None
 
-    def _static(self, rel: str):
+    def _static(self, rel: str, extra: dict | None = None):
         p = (WEB / rel).resolve()
         if WEB.resolve() not in p.parents and p != WEB.resolve():
             return self._error("非法路径", 403)
@@ -502,7 +645,7 @@ class Handler(BaseHTTPRequestHandler):
         ctype = mimetypes.guess_type(str(p))[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype == "application/javascript":
             ctype += "; charset=utf-8"
-        self._send(200, p.read_bytes(), ctype)
+        self._send(200, p.read_bytes(), ctype, extra)
 
     def _download(self, path: str):
         try:

@@ -6,8 +6,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import pathlib
+import re
 import secrets
 
 from . import APP_VERSION, paths
@@ -20,18 +22,19 @@ def _new_random_password() -> str:
     return "".join(secrets.choice(alphabet) for _ in range(12))
 
 def _seed_from_resource(target: pathlib.Path) -> bool:
-    """首次运行没有密码文件时生成一份（随机口令，打印到控制台提示用户改掉）。
+    """首次运行没有密码文件时生成一份（随机口令，写到同目录的提示文件）。
 
     绝不使用固定默认口令——仓库是公开的。
+    注意：只要同目录已有 *_secret.json 就算已初始化，否则会覆盖用户刚设的密码。
     """
     try:
         p = pathlib.Path(target)
-        if p.exists():
+        if p.exists() or p.with_suffix(".json").exists():
             return False
         p.parent.mkdir(parents=True, exist_ok=True)
         pwd = _new_random_password()
-        from app.admin_secret import new_secret_file_text
-        p.write_text(new_secret_file_text(pwd), encoding="utf-8")
+        salt = secrets.token_hex(16)
+        write_secret(salt, _hash_scrypt(pwd, salt), p)
         # 不打印明文口令：发行包以无窗口方式启动，控制台本就看不到，
         # 且易被截图/日志留存。口令写在说明文件里，用完请删除。
         try:
@@ -65,28 +68,67 @@ else:
     SECRET_PATH = paths.ROOT / "app" / "admin_secret.py"
 
 def _hash(password: str, salt: str) -> str:
+    """单轮 SHA-256：仅用于兼容旧密码文件，新文件一律用 scrypt。"""
     return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
 
-def load_secret(path: pathlib.Path | None = None) -> tuple[str, str]:
-    """读取源代码里的 (盐, 哈希)。每次读取都重新解析文件，改密后立即生效。
 
-    注意：不能用 importlib 加载——新旧文件字节数相同且同一秒内改写时，
-    会命中 __pycache__ 里的旧 .pyc，导致旧密码改完仍然有效。
+SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 14, 8, 1
+
+
+def _hash_scrypt(password: str, salt: str) -> str:
+    """口令哈希用 scrypt（标准库自带），比单轮 SHA-256 抗 GPU 暴力破解强几个数量级。"""
+    dk = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt),
+                        n=SCRYPT_N, r=SCRYPT_R, p=SCRYPT_P, dklen=32)
+    return "scrypt$%d$%d$%d$%s" % (SCRYPT_N, SCRYPT_R, SCRYPT_P, dk.hex())
+
+
+def _verify_hash(password: str, salt: str, stored: str) -> bool:
+    """支持 scrypt（新）与单轮 SHA-256（旧文件）。"""
+    try:
+        if stored.startswith("scrypt$"):
+            _, n, r, p, hexdk = stored.split("$", 4)
+            dk = hashlib.scrypt(password.encode("utf-8"), salt=bytes.fromhex(salt),
+                                n=int(n), r=int(r), p=int(p), dklen=len(hexdk) // 2)
+            return secrets.compare_digest(dk.hex(), hexdk)
+        return secrets.compare_digest(_hash(password, salt), stored)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def load_secret(path: pathlib.Path | None = None) -> tuple[str, str]:
+    """读取 (盐, 哈希)。
+
+    优先读 JSON（*_secret.json，安全，不执行代码）；兼容旧的 .py 文件，
+    但**不再 exec**——只用正则抽出常量，避免密码文件被写入任意代码后被执行。
     """
     p = pathlib.Path(path or SECRET_PATH)
-    if not p.exists() and p == SECRET_PATH:
-        # 首次运行（源码模式且仓库里没有密码文件）：从内置种子生成一份随机密码
+    jp0 = p.with_suffix(".json")
+    if not jp0.exists() and not p.exists() and p == SECRET_PATH:
         _seed_from_resource(p)
-    if not p.exists():
+    if not jp0.exists() and not p.exists():
         raise ValueError("管理员密码文件缺失：%s" % p)
+
+    # 新格式：JSON
+    jp = p.with_suffix(".json")
+    if jp.exists():
+        try:
+            data = json.loads(jp.read_text(encoding="utf-8"))
+            salt = str(data.get("salt") or "")
+            hashed = str(data.get("hash") or "")
+            if salt and hashed:
+                return salt, hashed
+        except Exception:
+            pass
+
+    # 旧格式：.py 常量（正则提取，不执行）
     try:
         text = p.read_text(encoding="utf-8")
-        ns: dict = {}
-        exec(compile(text, str(p), "exec"), ns)  # noqa: S102 - 只执行本地固定格式文件
     except Exception as e:  # noqa: BLE001
         raise ValueError("管理员密码文件无法读取：%s (%s)" % (p, e)) from e
-    salt = str(ns.get("SALT") or "")
-    hashed = str(ns.get("HASH") or "")
+    m_s = re.search(r'^SALT\s*=\s*"([0-9a-fA-F]+)"', text, re.M)
+    m_h = re.search(r'^HASH\s*=\s*"([^"]*)"', text, re.M)
+    salt = m_s.group(1) if m_s else ""
+    hashed = m_h.group(1) if m_h else ""
     if not salt or not hashed:
         raise ValueError("管理员密码文件缺少 SALT/HASH：%s" % p)
     return salt, hashed
@@ -99,7 +141,7 @@ def verify(cfg: dict, password: str) -> bool:
         return False
     if not stored:
         return False
-    return secrets.compare_digest(_hash(str(password or ""), salt), stored)
+    return _verify_hash(str(password or ""), salt, stored)
 
 def set_password(new_password: str) -> None:
     """修改密码：生成新盐与哈希，写回密码文件（打包运行时写用户目录里的副本）。"""
@@ -109,28 +151,30 @@ def set_password(new_password: str) -> None:
     if paths.is_frozen() and not pathlib.Path(SECRET_PATH).exists():
         _seed_from_resource(pathlib.Path(SECRET_PATH))
     salt = secrets.token_hex(16)
-    hashed = _hash(pwd, salt)
+    hashed = _hash_scrypt(pwd, salt)
     write_secret(salt, hashed)
 
 def write_secret(salt: str, hashed: str, path: pathlib.Path | None = None) -> None:
-    """把盐与哈希写回 Python 源代码文件（先写临时文件再原子替换）。"""
+    """把盐与哈希写成 JSON（原子替换）。
+
+    不再写可执行的 .py：密码文件在用户可写目录里，若被塞入任意代码，
+    读回时 exec() 就会执行它。JSON 只做数据解析，没有这个风险。
+    """
     p = pathlib.Path(path or SECRET_PATH)
-    text = (
-        '"""管理员密码的盐与哈希。由管理员面板自动改写，请勿手工编辑。"""\n'
-        'SALT = "%s"\n'
-        'HASH = "%s"\n'
-    ) % (str(salt), str(hashed))
+    jp = p.with_suffix(".json")
     p.parent.mkdir(parents=True, exist_ok=True)
-    tmp = p.with_name(p.name + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
+    payload = json.dumps({"salt": str(salt), "hash": str(hashed),
+                          "algo": "scrypt"}, ensure_ascii=False, indent=1)
+    tmp = jp.with_name(jp.name + ".tmp")
+    tmp.write_text(payload, encoding="utf-8")
     try:
-        os.replace(tmp, p)
+        os.replace(tmp, jp)
     except OSError as e:
         try:
             tmp.unlink()
         except OSError:
             pass
-        raise ValueError("无法写入管理员密码源代码文件：%s" % e) from e
+        raise ValueError("无法写入管理员密码文件：%s" % e) from e
 
 def admin_cfg(cfg: dict) -> dict:
     """补齐默认值后的 admin 配置（供后端逻辑使用）。"""

@@ -7,7 +7,10 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import pathlib
+import sys
+import threading
 
 from . import APP_VERSION, paths
 
@@ -87,6 +90,9 @@ def _deep_merge(base: dict, patch: dict) -> dict:
     return out
 
 
+_SAVE_LOCK = threading.Lock()
+
+
 def load() -> dict:
     data: dict = {}
     if CONFIG_PATH.exists():
@@ -94,13 +100,30 @@ def load() -> dict:
             data = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         except Exception:
             data = {}
+            # 读坏了不能静默退回默认值——用户会以为 Key 丢了
+            try:
+                broken = CONFIG_PATH.with_suffix(".json.broken")
+                CONFIG_PATH.replace(broken)
+                print("[ReSTAgent] 配置文件损坏，已备份为 %s 并恢复默认值" % broken.name,
+                      file=sys.stderr)
+            except Exception:
+                pass
     return _deep_merge(DEFAULTS, data)
 
 
 def save(patch: dict) -> dict:
-    cfg = _deep_merge(load(), patch or {})
-    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
-    return cfg
+    """读-改-写全程加锁，并写临时文件后原子替换。
+
+    直接 write_text 有两个问题：并发保存会互相覆盖；写到一半断电会留下
+    截断的 config.json，下次 load() 退化成默认值、API Key 凭空消失。
+    """
+    with _SAVE_LOCK:
+        cfg = _deep_merge(load(), patch or {})
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = CONFIG_PATH.with_name(CONFIG_PATH.name + ".tmp")
+        tmp.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, CONFIG_PATH)
+        return cfg
 
 
 def masked(cfg: dict) -> dict:

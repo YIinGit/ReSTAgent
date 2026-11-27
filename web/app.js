@@ -19,8 +19,19 @@ const state = {
 };
 
 /* ---------------- 基础 ---------------- */
+function authToken() {
+  // 桌面模式由 desktop.py 拼 ?t=token；首页会把它换成 cookie，这里做兜底
+  try {
+    const t = new URLSearchParams(location.search).get("t");
+    if (t) { sessionStorage.setItem("ra_token", t); return t; }
+    return sessionStorage.getItem("ra_token") || "";
+  } catch (e) { return ""; }
+}
+
 async function api(path, { method = "GET", body = null, headers = null } = {}) {
   const opts = { method, headers: Object.assign({}, headers || {}) };
+  const tk = authToken();
+  if (tk) opts.headers["X-Auth-Token"] = tk;
   if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
   const res = await fetch(path, opts);
   let data = {};

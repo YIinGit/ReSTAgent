@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
 import webbrowser
 
@@ -26,7 +27,7 @@ from http.server import ThreadingHTTPServer  # noqa: E402
 
 from app import APP_NAME, APP_TAGLINE, APP_VERSION  # noqa: E402
 from app import paths  # noqa: E402
-from app.server import HITS, Handler, pick_port  # noqa: E402
+from app.server import HITS, SESSION_TOKEN, Handler, pick_port  # noqa: E402
 
 DATA_DIR = paths.user_dir()
 LOG_PATH = DATA_DIR / "desktop.log"
@@ -202,23 +203,34 @@ def main(argv=None) -> int:
             return 0
 
     port = pick_port(args.port)
-    url = "http://127.0.0.1:%d" % port
+    base = "http://127.0.0.1:%d" % port
+    admin_url = base + "/?t=" + urllib.parse.quote(SESSION_TOKEN)
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    log("服务启动：%s" % url)
+    log("服务启动：%s" % base)
+    url = admin_url   # 浏览器用的地址带 token；probe 用 base 不带
 
     browser = args.browser or find_browser()
 
     if args.selftest:
-        info = probe(url)
-        with urllib.request.urlopen(url + "/", timeout=5) as r:
-            html = r.read().decode("utf-8", "ignore")
-        ok = bool(info) and APP_NAME in html
+        # 自检走带 token 的地址（安全层默认开启，不带 token 会被 401）
+        import urllib.request as _rq
+        def _get(u):
+            r = _rq.Request(u, headers={"X-Auth-Token": SESSION_TOKEN})
+            with _rq.urlopen(r, timeout=5) as resp:
+                return resp.read().decode("utf-8", "ignore")
+        html = _get(admin_url)                       # 首页：?t= 会同时下发 cookie
+        try:
+            info = __import__("json").loads(_get(base + "/api/health?t=" + SESSION_TOKEN))
+        except Exception as e:  # noqa: BLE001
+            info = {"ok": False, "error": str(e)}
+        ok = bool(info.get("ok")) and APP_NAME in html
         print("Python：", sys.version.split()[0], "|", sys.executable)
-        print("服务：", url)
+        print("服务：", base)
         print("health：", info)
         print("首页含 ReSTAgent：", APP_NAME in html)
+        print("访问令牌：", "已启用（浏览器地址自带 ?t=）")
         print("浏览器：", browser or "（未找到 Edge/Chrome，将退回默认浏览器 + 控制窗）")
         print("数据目录：", DATA_DIR)
         print("自检结果：", "通过" if ok else "未通过")

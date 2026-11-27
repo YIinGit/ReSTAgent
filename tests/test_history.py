@@ -250,14 +250,28 @@ def check_admin(c: Api, old_pw: str, new_pw: str):
     raw = config_mod.CONFIG_PATH.read_text(encoding="utf-8")
     assert "password_hash" not in raw and "password_salt" not in raw, "密码不该再写进 config"
     assert old_pw not in raw and new_pw not in raw
-    src = admin_mod.SECRET_PATH.read_text(encoding="utf-8")
-    assert "SALT" in src and "HASH" in src
-    assert old_pw not in src and new_pw not in src, "源码里只能有盐与哈希"
+    # 密码文件现在是 JSON（不执行代码），hash 用 scrypt
+    import json as _json
+    jp = admin_mod.SECRET_PATH.with_suffix(".json")
+    assert jp.exists(), "密码应存成 JSON：%s" % jp
+    data = _json.loads(jp.read_text(encoding="utf-8"))
+    assert data.get("algo") == "scrypt", data
+    blob = jp.read_text(encoding="utf-8")
+    assert old_pw not in blob and new_pw not in blob, "文件里只能有盐与哈希"
     salt, hashed = admin_mod.load_secret()
-    assert len(salt) == 32 and len(hashed) == 64
+    assert len(salt) == 32 and hashed.startswith("scrypt$")
     assert admin_mod.verify({}, new_pw) is True
     assert admin_mod.verify({}, old_pw) is False
-    print("password stored in source secret file (salt/hash only) | salt len:", len(salt))
+    print("password stored as JSON + scrypt | salt len:", len(salt))
+
+    # 登录爆破防护：连续失败会被限速
+    srv.LOGIN_FAILS.clear()
+    codes = []
+    for _ in range(srv.LOGIN_MAX_FAILS + 1):
+        codes.append(status_of(lambda: c.req("/api/admin/login", "POST", {"password": "wrong"})))
+    assert codes[-1] == 429, "连续失败应返回 429：%s" % codes
+    srv.LOGIN_FAILS.clear()
+    print("brute-force guard ok:", codes)
 
 
 def check_sse(c: Api, created: list):
@@ -470,13 +484,15 @@ def main() -> int:
     config_mod.CONFIG_PATH = tmp / "config.json"
     rules_lib.CUSTOM_PATH = tmp / "rules_custom.json"
     # 管理员密码只存源代码文件；测试改到临时文件，绝不碰真实 app/admin_secret.py
-    admin_mod.SECRET_PATH = tmp / "admin_secret.py"
+    admin_mod.SECRET_PATH = tmp / "admin_secret"
     old_pw = secrets.token_urlsafe(9)
     new_pw = secrets.token_urlsafe(9)
     admin_mod.set_password(old_pw)
     srv.ADMIN_TOKENS.clear()
     created: list[str] = []
 
+    # 安全层默认开启：测试里关掉来源校验（等价于浏览器带着正确 token 访问）
+    srv.ALLOW_ANY_ORIGIN = True
     port = free_port()
     httpd = ThreadingHTTPServer(("127.0.0.1", port), srv.Handler)
     httpd.daemon_threads = True
