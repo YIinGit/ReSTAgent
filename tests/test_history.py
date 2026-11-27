@@ -218,25 +218,27 @@ def check_admin(c: Api, old_pw: str, new_pw: str):
     h = {"X-Admin-Token": token}
     print("admin login ok, token:", token[:8] + "…")
 
-    code = status_of(lambda: c.req("/api/admin/save", "POST", {"notice": "x"}))
+    code = status_of(lambda: c.req("/api/admin/save", "POST", {"api_defaults": {}}))
     assert code == 401, "未登录不能写管理员配置"
     state = c.req("/api/admin/state", "POST", {}, headers=h)
-    assert state["admin"]["version"], state
     assert "password_hash" not in state["admin"] and "password_salt" not in state["admin"]
 
-    r = c.req("/api/admin/save", "POST", {
-        "notice": "本周五截稿",
-        "version": "9.9.9",
-        "staff": [{"name": "张三", "role": "主编"}, {"name": "李四", "role": "编辑"}],
-    }, headers=h)
-    assert r["health"]["notice"] == "本周五截稿"
+    # 公告 / 版本号 / 制作人员 已写死在 app/about.py，面板不再能改
     health = c.req("/api/health")
-    assert health["version"] == "9.9.9", health
-    assert [s["name"] for s in health["staff"]] == ["张三", "李四"]
+    from app import APP_VERSION, about
+    assert health["version"] == APP_VERSION, health
+    assert health["notice"] == "", health
+    assert health["staff"] == about.public()["staff"], health
+    print("admin 面板不再改公告/版本/人员；health 版本", health["version"],
+          "| staff", [s["name"] for s in health["staff"]])
+
+    r = c.req("/api/admin/save", "POST", {
+        "api_defaults": {"base_url": "https://example.com/v1"},
+    }, headers=h)
+    assert r.get("ok") is True, r
     cfg = c.req("/api/config")
     assert "password_hash" not in cfg["admin"] and "password_salt" not in cfg["admin"]
-    print("admin save -> version", health["version"], "| notice", health["notice"],
-          "| staff", health["staff"])
+    print("admin save api_defaults ok")
 
     r = c.req("/api/admin/password", "POST", {"new_password": new_pw}, headers=h)
     assert r["ok"] is True

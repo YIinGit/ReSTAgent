@@ -15,7 +15,7 @@ const state = {
   cfg: null, files: [], stage: "second", level: "standard",
   job: null, jobId: null, curFile: null, sel: null,
   filterSev: "all", filterStatus: "all", poll: null, exporting: false,
-  history: [], rules: null, stream: null, adminToken: null, adminStaff: [],
+  history: [], rules: null, stream: null, adminToken: null,
 };
 
 /* ---------------- 基础 ---------------- */
@@ -895,9 +895,7 @@ async function loadAdminState() {
     const r = await api("/api/admin/state", { method: "POST", body: {}, headers: adminHeaders() });
     const a = r.admin || {};
     const ad = a.api_defaults || {};
-    $("#adminNotice").value = a.notice || "";
-    $("#adminVersion").value = a.version || "";
-    $("#adminBase").value = ad.base_url || "";
+        $("#adminBase").value = ad.base_url || "";
     const m = ad.models || {};
     $("#adminModelLight").value = m.light || "";
     $("#adminModelStandard").value = m.standard || "";
@@ -906,40 +904,14 @@ async function loadAdminState() {
     $("#adminSendKey").checked = !!ad.send_key;
     $("#adminKey").value = "";
     $("#adminKey").placeholder = ad.api_key_set ? "已保存：" + (ad.api_key_hint || "") + "（留空则沿用）" : "可选";
-    state.adminStaff = (a.staff || []).map((s) => ({ name: s.name || "", role: s.role || "" }));
-    renderAdminStaff();
     $("#adminMsg").textContent = "";
   } catch (e) {
     $("#adminMsg").textContent = "读取管理员配置失败：" + e.message;
   }
 }
 
-function renderAdminStaff() {
-  $("#staffRows").innerHTML = state.adminStaff.map((s, i) => `
-    <div class="staff-row">
-      <input class="input" data-staff-name="${i}" value="${esc(s.name)}" placeholder="姓名" />
-      <input class="input" data-staff-role="${i}" value="${esc(s.role)}" placeholder="角色" />
-      <button class="btn btn-mini" data-staff-del="${i}">删除</button>
-    </div>`).join("");
-}
-
-function collectStaff() {
-  const names = $$("#staffRows [data-staff-name]");
-  const roles = $$("#staffRows [data-staff-role]");
-  const out = [];
-  names.forEach((inp, i) => {
-    const name = inp.value.trim();
-    const role = roles[i] ? roles[i].value.trim() : "";
-    if (name || role) out.push({ name, role });
-  });
-  return out;
-}
-
 async function saveAdmin() {
   const body = {
-    notice: $("#adminNotice").value,
-    version: $("#adminVersion").value.trim(),
-    staff: collectStaff(),
     api_defaults: {
       base_url: $("#adminBase").value.trim(),
       models: {
@@ -954,9 +926,7 @@ async function saveAdmin() {
   };
   try {
     const r = await api("/api/admin/save", { method: "POST", body, headers: adminHeaders() });
-    state.adminStaff = ((r.admin || {}).staff || []).map((s) => ({ name: s.name || "", role: s.role || "" }));
-    renderAdminStaff();
-    $("#adminKey").value = "";
+      $("#adminKey").value = "";
     $("#adminMsg").textContent = "已保存管理员设置";
     await loadConfig();
     toast("管理员设置已保存");
@@ -1117,18 +1087,6 @@ function bind() {
   $("#btnAdminLogin").addEventListener("click", adminLogin);
   $("#btnAdminSave").addEventListener("click", saveAdmin);
   $("#btnAdminPwd").addEventListener("click", changeAdminPassword);
-  $("#btnAddStaff").addEventListener("click", () => {
-    state.adminStaff = collectStaff();
-    state.adminStaff.push({ name: "", role: "" });
-    renderAdminStaff();
-  });
-  $("#staffRows").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-staff-del]");
-    if (!b) return;
-    state.adminStaff = collectStaff();
-    state.adminStaff.splice(+b.dataset.staffDel, 1);
-    renderAdminStaff();
-  });
 
   $("#btnAiClose").addEventListener("click", () => {
     closeStream();

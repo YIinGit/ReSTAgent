@@ -38,7 +38,7 @@ SKIP_SUFFIX = {".pyc", ".pyo"}
 # 内部材料：不进发行包、不进仓库
 IGNORE_EXTRA = {"2026活动部教案-给AI的版本.docx", "AI评审提示词.md"}
 
-SKIP_FILES = {"admin_secret.py", "config.json", "layout_rules.json",
+SKIP_FILES = {"config.json", "layout_rules.json",
               "2026活动部教案-给AI的版本.docx"} | IGNORE_EXTRA
 
 

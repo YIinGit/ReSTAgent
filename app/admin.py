@@ -14,12 +14,10 @@ from . import APP_VERSION, paths
 
 MODEL_KEYS = ("light", "standard", "strict", "max")
 
-
 def _new_random_password() -> str:
     """首次运行生成随机初始口令（12 位，去掉易混字符）。"""
     alphabet = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     return "".join(secrets.choice(alphabet) for _ in range(12))
-
 
 def _seed_from_resource(target: pathlib.Path) -> bool:
     """首次运行没有密码文件时生成一份（随机口令，打印到控制台提示用户改掉）。
@@ -34,15 +32,18 @@ def _seed_from_resource(target: pathlib.Path) -> bool:
         pwd = _new_random_password()
         from app.admin_secret import new_secret_file_text
         p.write_text(new_secret_file_text(pwd), encoding="utf-8")
+        # 不打印明文口令：发行包以无窗口方式启动，控制台本就看不到，
+        # 且易被截图/日志留存。口令写在说明文件里，用完请删除。
         try:
-            print("[ReSTAgent] 已生成管理员初始密码：%s" % pwd, file=__import__("sys").stderr)
-            print("[ReSTAgent] 请登录「管理员」面板后立刻修改。", file=__import__("sys").stderr)
+            hint = p.parent / "管理员初始密码.txt"
+            hint.write_text(
+                "管理员初始密码：%s\n请登录「管理员」面板后立刻修改，然后删除本文件。\n" % pwd,
+                encoding="utf-8")
         except Exception:
             pass
         return True
     except Exception:  # noqa: BLE001
         return False
-
 
 if paths.is_frozen():
     # 打包后 _MEIPASS 只读：密码文件放在用户目录，首次运行时从包内种子复制
@@ -63,10 +64,8 @@ elif (paths.ROOT / "user" / "admin_secret.py").exists():
 else:
     SECRET_PATH = paths.ROOT / "app" / "admin_secret.py"
 
-
 def _hash(password: str, salt: str) -> str:
     return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
-
 
 def load_secret(path: pathlib.Path | None = None) -> tuple[str, str]:
     """读取源代码里的 (盐, 哈希)。每次读取都重新解析文件，改密后立即生效。
@@ -92,7 +91,6 @@ def load_secret(path: pathlib.Path | None = None) -> tuple[str, str]:
         raise ValueError("管理员密码文件缺少 SALT/HASH：%s" % p)
     return salt, hashed
 
-
 def verify(cfg: dict, password: str) -> bool:
     """校验管理员密码。密码不再存在 config 里，cfg 参数仅为兼容旧调用保留。"""
     try:
@@ -102,7 +100,6 @@ def verify(cfg: dict, password: str) -> bool:
     if not stored:
         return False
     return secrets.compare_digest(_hash(str(password or ""), salt), stored)
-
 
 def set_password(new_password: str) -> None:
     """修改密码：生成新盐与哈希，写回密码文件（打包运行时写用户目录里的副本）。"""
@@ -114,7 +111,6 @@ def set_password(new_password: str) -> None:
     salt = secrets.token_hex(16)
     hashed = _hash(pwd, salt)
     write_secret(salt, hashed)
-
 
 def write_secret(salt: str, hashed: str, path: pathlib.Path | None = None) -> None:
     """把盐与哈希写回 Python 源代码文件（先写临时文件再原子替换）。"""
@@ -136,7 +132,6 @@ def write_secret(salt: str, hashed: str, path: pathlib.Path | None = None) -> No
             pass
         raise ValueError("无法写入管理员密码源代码文件：%s" % e) from e
 
-
 def admin_cfg(cfg: dict) -> dict:
     """补齐默认值后的 admin 配置（供后端逻辑使用）。"""
     adm = dict((cfg or {}).get("admin") or {})
@@ -154,47 +149,19 @@ def admin_cfg(cfg: dict) -> dict:
     adm["api_defaults"] = ad
     return adm
 
-
 def public(cfg: dict) -> dict:
-    """普通界面可见的只读信息：公告、版本号、制作人员。"""
-    adm = admin_cfg(cfg)
-    staff = []
-    for it in adm.get("staff") or []:
-        if not isinstance(it, dict):
-            continue
-        name = str(it.get("name") or "").strip()
-        role = str(it.get("role") or "").strip()
-        if name or role:
-            staff.append({"name": name, "role": role})
-    return {
-        "notice": str(adm.get("notice") or ""),
-        "version": str(adm.get("version") or APP_VERSION),
-        "staff": staff,
-    }
+    """普通界面可见的只读信息（制作人员与版本号已移至 app/about.py）。
 
-
-def _clean_staff(items) -> list[dict]:
-    out = []
-    for it in (items or [])[:80]:
-        if not isinstance(it, dict):
-            continue
-        name = str(it.get("name") or "").strip()[:40]
-        role = str(it.get("role") or "").strip()[:40]
-        if name or role:
-            out.append({"name": name, "role": role})
-    return out
+    保留此函数只为兼容旧调用，返回空公告；新代码请用 about.public()。
+    """
+    return {"notice": "", "version": APP_VERSION, "staff": []}
 
 
 def save_patch(cfg: dict, body: dict) -> dict:
     """把管理员面板提交的内容整理成 config.save 的 patch，并处理「下发 Key」。"""
     adm = admin_cfg(cfg)
     patch: dict = {"admin": {}}
-    if "notice" in body:
-        patch["admin"]["notice"] = str(body.get("notice") or "")[:2000]
-    if "version" in body:
-        patch["admin"]["version"] = str(body.get("version") or "").strip()[:40]
-    if "staff" in body:
-        patch["admin"]["staff"] = _clean_staff(body.get("staff"))
+    # 公告 / 版本号 / 制作人员 已写死在 app/about.py，不再由面板维护
 
     ad_body = body.get("api_defaults")
     if isinstance(ad_body, dict):

@@ -22,6 +22,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(ROOT))
     from app import APP_NAME, APP_TAGLINE, APP_VERSION  # noqa: E402
     from app import admin as admin_mod  # noqa: E402
+    from app import about as about_mod  # noqa: E402
     from app import config as config_mod  # noqa: E402
     from app import jobs as jobs_mod  # noqa: E402
     from app import paths  # noqa: E402
@@ -35,6 +36,7 @@ if __package__ in (None, ""):
 else:
     from . import APP_NAME, APP_TAGLINE, APP_VERSION  # noqa: E402
     from . import admin as admin_mod  # noqa: E402
+    from . import about as about_mod  # noqa: E402
     from . import config as config_mod  # noqa: E402
     from . import jobs as jobs_mod  # noqa: E402
     from . import paths  # noqa: E402
@@ -315,15 +317,15 @@ class Handler(BaseHTTPRequestHandler):
 
     # ---------- 具体处理 ----------
     def _health(self) -> dict:
-        cfg = config_mod.load()
-        pub = admin_mod.public(cfg)
+        # 制作人员与版本号写死在 app/about.py，不再由管理员面板维护
+        pub = about_mod.public()
         return {
             "ok": True,
-            "name": APP_NAME,
-            "version": pub["version"] or APP_VERSION,
+            "name": pub["name"],
+            "version": pub["version"],
             "app_version": APP_VERSION,
-            "tagline": APP_TAGLINE,
-            "notice": pub["notice"],
+            "tagline": pub["tagline"],
+            "notice": "",
             "staff": pub["staff"],
         }
 
