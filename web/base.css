@@ -30,6 +30,12 @@ em{font-style:normal}
   background:var(--bg-1);border-bottom:1px solid var(--line);
   position:sticky;top:0;z-index:50;
 }
+/* 左上角协会角标：32px 高，深色转白 */
+.topbar-logo{
+  height:22px;width:auto;flex:none;
+  margin-right:2px;opacity:.9;
+}
+[data-theme="dark"] .topbar-logo{filter:brightness(0) invert(1)}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
 .logo{
   width:28px;height:28px;border-radius:var(--r-sm);display:grid;place-items:center;
@@ -160,7 +166,7 @@ textarea.input{min-height:84px;resize:vertical}
   background:var(--bg-1);border-top:1px solid var(--line);
   font-size:var(--t-xs);color:var(--ink-3);
 }
-.sta-logo{height:15px;width:auto;opacity:.85}
+.sta-logo{height:14px;width:auto;opacity:.8}
 .foot-copy,.foot-credit{white-space:nowrap}
 .foot-credit{color:var(--ink-2)}
 .foot-sep{opacity:.5}
@@ -175,3 +181,7 @@ body{padding-bottom:34px}
   .foot-copy{white-space:normal;text-align:center;line-height:1.5}
   body{padding-bottom:56px}
 }
+
+/* 顶栏角标与两侧元素的间距 */
+.camp-topbar .topbar-logo{height:22px;margin-right:4px}
+.topbar .brand .topbar-logo{height:22px}

@@ -452,3 +452,11 @@ body{
 
 /* 固定版权页脚占位：封面网格底部留白 */
 .cover{padding-bottom:34px}
+
+/* ---------------- 左上角协会角标 ---------------- */
+.cover-logo{
+  position:fixed;top:20px;left:22px;z-index:8;
+  height:24px;width:auto;opacity:.9;
+}
+[data-theme="dark"] .cover-logo{filter:brightness(0) invert(1)}
+@media (max-width:640px){ .cover-logo{height:20px;top:16px;left:16px} }
