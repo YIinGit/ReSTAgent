@@ -30,12 +30,13 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 VERSION = sys.argv[1] if len(sys.argv) > 1 else "0.2"
 OUT = ROOT / "release" / ("ReSTAgent_v%s" % VERSION)
 
-COPY_TREES = ["app", "web", "vendor"]
+COPY_TREES = ["app", "web", "vendor", "docs"]
 COPY_FILES = ["ReSTAgent.bat", "ReSTAgent.pyw", "README.md"]
 SKIP_DIRS = {"__pycache__", ".pytest_cache", ".git"}
 SKIP_SUFFIX = {".pyc", ".pyo"}
 # 敏感/生成文件：绝不进发行包
-SKIP_FILES = {"admin_secret.py", "config.json", "layout_rules.json"}
+SKIP_FILES = {"admin_secret.py", "config.json", "layout_rules.json",
+              "2026活动部教案-给AI的版本.docx"}
 
 
 def copytree(src: pathlib.Path, dst: pathlib.Path) -> int:

@@ -1,0 +1,125 @@
+/* 活动策划案初审 —— 独立页面样式（复用 style.css 的配色变量） */
+.camp-body{background:var(--bg);color:var(--ink)}
+.camp-main{max-width:1240px;margin:0 auto;padding:28px 24px 64px}
+.camp-view{animation:campFade .15s ease}
+
+@keyframes campFade{from{opacity:0}to{opacity:1}}
+
+/* 顶栏 */
+.camp-topbar{
+  display:flex;align-items:center;gap:16px;padding:16px 28px;
+  background:var(--panel);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:20;
+}
+.camp-back{
+  width:34px;height:34px;display:grid;place-items:center;border-radius:9px;
+  border:1px solid var(--line);color:var(--ink-2);text-decoration:none;font-size:16px;
+  transition:border-color .15s;
+}
+.camp-back:hover{border-color:var(--accent);color:var(--accent)}
+.camp-brand h1{margin:0;font-size:16px;font-weight:600}
+.camp-brand p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.camp-topbar .btn{margin-left:auto}
+
+/* 上传区 */
+.camp-drop{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  min-height:210px;border:1.5px dashed var(--line-strong);border-radius:14px;
+  background:var(--panel);cursor:pointer;transition:border-color .15s,background .15s;
+}
+.camp-drop:hover,.camp-drop.is-over{border-color:var(--accent);background:var(--accent-soft)}
+.camp-drop-icon{font-size:30px;color:var(--muted);line-height:1}
+.camp-drop-main{font-size:15px;font-weight:600}
+.camp-drop-sub{font-size:12px;color:var(--muted)}
+
+.camp-filename{
+  margin-top:12px;padding:12px 16px;border-radius:10px;background:var(--panel);
+  border:1px solid var(--line);font-size:14px;font-weight:600;color:var(--accent);
+}
+
+/* 选项 */
+.camp-options{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px}
+.camp-field{display:flex;flex-direction:column;gap:6px}
+.camp-field span{font-size:12px;color:var(--muted)}
+.camp-field .input{
+  padding:9px 12px;border:1px solid var(--line);border-radius:9px;
+  background:var(--field);color:var(--ink);font-size:13px;
+}
+
+/* 开始 */
+.camp-start{display:flex;align-items:center;gap:16px;margin-top:26px}
+.camp-hint{font-size:12px;color:var(--muted)}
+
+/* 进度 */
+.camp-run-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.camp-run-head h2{margin:0;font-size:16px}
+.camp-pct{font-size:22px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
+.camp-progress{height:6px;border-radius:3px;background:var(--panel-3);margin:14px 0 18px;overflow:hidden}
+.camp-progress>div{height:100%;width:0;background:var(--accent);transition:width .25s ease}
+.camp-log{
+  max-height:52vh;overflow:auto;padding:14px 16px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);
+  font:12px/1.8 ui-monospace,Consolas,monospace;color:var(--ink-2);
+}
+.camp-log .t{color:var(--muted);margin-right:10px}
+.camp-log .error{color:var(--danger)}
+
+/* 结论 */
+.camp-verdict{
+  padding:18px 20px;border-radius:12px;border:1px solid var(--line);background:var(--panel);
+}
+.camp-verdict.pass{border-color:var(--ok-line);background:var(--ok-soft)}
+.camp-verdict.revise{border-color:var(--warn-line);background:var(--warn-soft)}
+.camp-verdict.return{border-color:var(--danger-line);background:var(--danger-soft)}
+.camp-verdict h2{margin:0 0 6px;font-size:17px}
+.camp-verdict p{margin:0;font-size:13px;color:var(--ink-2)}
+.camp-verdict .tag{
+  display:inline-block;font-size:11px;padding:2px 9px;border-radius:999px;
+  background:var(--panel);border:1px solid var(--line);margin-right:6px;color:var(--ink-2);
+}
+
+.camp-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 20px}
+.camp-counts{font-size:13px;color:var(--muted);margin-right:auto}
+.camp-actions a{text-decoration:none}
+
+/* 清单 + 详情 */
+.camp-split{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:18px;align-items:start}
+.camp-list{display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 300px);overflow:auto;padding-right:4px}
+.camp-group{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.5px;margin:8px 0 2px}
+.camp-card{
+  padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--panel);
+  cursor:pointer;transition:border-color .15s,box-shadow .15s;
+}
+.camp-card:hover{border-color:var(--line-strong)}
+.camp-card.is-active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.camp-card-top{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.camp-badge{font-size:11px;padding:1px 8px;border-radius:999px;font-weight:600}
+.camp-badge.must{background:var(--danger-soft);color:var(--danger);border:1px solid var(--danger-line)}
+.camp-badge.suggest{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn-line)}
+.camp-card-problem{margin-top:5px;font-size:13px;line-height:1.55;color:var(--ink-2)}
+
+.camp-detail{
+  padding:20px 22px;border:1px solid var(--line);border-radius:12px;background:var(--panel);
+  min-height:300px;
+}
+.camp-empty{color:var(--muted);font-size:13px;padding:40px 0;text-align:center}
+.camp-detail h3{margin:0 0 4px;font-size:15px}
+.camp-detail .meta{font-size:12px;color:var(--muted);margin-bottom:14px}
+.camp-quote{
+  padding:12px 14px;border-left:3px solid var(--line-strong);background:var(--panel-3);
+  border-radius:0 8px 8px 0;font-size:13px;line-height:1.7;color:var(--ink-2);margin:0 0 16px;
+}
+.camp-block{margin-bottom:16px}
+.camp-block .k{font-size:12px;color:var(--muted);margin-bottom:4px}
+.camp-block .v{font-size:14px;line-height:1.7}
+.camp-rewrite{
+  padding:12px 14px;border:1px solid var(--ok-line);background:var(--ok-soft);
+  border-radius:8px;font-size:14px;line-height:1.7;
+}
+.camp-basis{font-size:12px;color:var(--muted);margin-top:4px}
+
+@media (max-width:960px){
+  .camp-options{grid-template-columns:1fr}
+  .camp-split{grid-template-columns:1fr}
+  .camp-list{max-height:none}
+}

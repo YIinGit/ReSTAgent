@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>活动策划案初审 · ReSTAgent</title>
+<script>try{var t=localStorage.getItem("restagent.theme");if(!t)t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.dataset.theme=t;}catch(e){}</script>
+<link rel="icon" href="/static/icon.png" />
+<link rel="stylesheet" href="/static/style.css" />
+<link rel="stylesheet" href="/static/campaign.css" />
+</head>
+<body class="camp-body">
+
+<header class="camp-topbar">
+  <a class="camp-back" href="/" title="返回审稿台">←</a>
+  <div class="camp-brand">
+    <h1>活动策划案初审</h1>
+    <p>依据《2026活动部教案》第四讲至第九讲 · 成都七中科协活动部</p>
+  </div>
+  <button id="btnTheme" class="btn btn-ghost btn-mini">深色</button>
+</header>
+
+<main class="camp-main">
+
+  <!-- 上传 -->
+  <section id="campSetup" class="camp-view">
+    <label id="campDrop" class="camp-drop">
+      <input id="campFile" type="file" accept=".docx" hidden />
+      <div class="camp-drop-icon">＋</div>
+      <div class="camp-drop-main">把策划案 .docx 拖到这里，或点击选择</div>
+      <div class="camp-drop-sub">原文不会被改动，批注另存为新文件</div>
+    </label>
+    <div id="campFileName" class="camp-filename is-hidden"></div>
+
+    <div class="camp-options">
+      <label class="camp-field">
+        <span>活动类型</span>
+        <select id="campKind" class="input">
+          <option value="">由系统判断</option>
+          <option value="商业推广活动">商业推广活动</option>
+          <option value="文化娱乐活动">文化娱乐活动</option>
+          <option value="公益慈善活动">公益慈善活动</option>
+          <option value="集体内部活动">集体内部活动</option>
+          <option value="科普知识活动">科普知识活动</option>
+        </select>
+      </label>
+      <label class="camp-field">
+        <span>提交对象</span>
+        <select id="campSubmission" class="input">
+          <option value="协内自用">协内自用（口语可不改）</option>
+          <option value="上报学校">上报学校（按书面语审）</option>
+          <option value="对外宣传">对外宣传（按书面语审）</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="camp-start">
+      <button id="btnCampStart" class="btn btn-primary btn-lg" disabled>开始初审</button>
+      <span class="camp-hint" id="campStartHint">先选择一份 .docx 策划案</span>
+    </div>
+  </section>
+
+  <!-- 进度 -->
+  <section id="campRunning" class="camp-view is-hidden">
+    <div class="camp-run-head">
+      <div>
+        <h2 id="campRunTitle">正在初审</h2>
+        <p class="camp-hint" id="campRunMsg">准备中…</p>
+      </div>
+      <span id="campRunPct" class="camp-pct">0%</span>
+    </div>
+    <div class="camp-progress"><div id="campProgressFill"></div></div>
+    <div id="campLog" class="camp-log"></div>
+  </section>
+
+  <!-- 结果 -->
+  <section id="campResult" class="camp-view is-hidden">
+    <div class="camp-verdict" id="campVerdict"></div>
+    <div class="camp-actions">
+      <button id="btnCampNew" class="btn btn-ghost">← 审下一份</button>
+      <span class="camp-counts" id="campCounts"></span>
+      <a id="btnCampDocx" class="btn btn-primary" href="#">导出批注版 Word</a>
+      <a id="btnCampMd" class="btn btn-ghost" href="#">导出意见 Markdown</a>
+    </div>
+    <div class="camp-split">
+      <aside class="camp-list" id="campList"></aside>
+      <section class="camp-detail" id="campDetail">
+        <div class="camp-empty">选择左侧一条意见查看详情</div>
+      </section>
+    </div>
+  </section>
+
+</main>
+<script src="/static/campaign.js"></script>
+</body>
+</html>

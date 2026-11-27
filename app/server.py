@@ -28,6 +28,7 @@ if __package__ in (None, ""):
     from app import rules_lib  # noqa: E402
     from app import third_jobs as third_mod  # noqa: E402
     from app.layout import standard as layout_std  # noqa: E402
+    from app import campaign_jobs as camp_mod  # noqa: E402
     from app.review import prompts  # noqa: E402
     from app.review.llm import Client, LLMError  # noqa: E402
     from app.review.pipeline import estimate  # noqa: E402
@@ -40,6 +41,7 @@ else:
     from . import rules_lib  # noqa: E402
     from . import third_jobs as third_mod  # noqa: E402
     from .layout import standard as layout_std  # noqa: E402
+    from . import campaign_jobs as camp_mod  # noqa: E402
     from .review import prompts  # noqa: E402
     from .review.llm import Client, LLMError  # noqa: E402
     from .review.pipeline import estimate  # noqa: E402
@@ -54,28 +56,38 @@ ADMIN_TOKENS: set[str] = set()   # 管理员登录后颁发的一次性令牌（
 
 
 def parse_multipart(body: bytes, boundary: bytes):
-    files = []
+    """返回 [(filename, data)]，只含带文件名的部分。"""
+    return parse_multipart_parts(body, boundary)[1]
+
+
+def parse_multipart_parts(body: bytes, boundary: bytes):
+    """解析 multipart，返回 (普通字段 dict, [(filename, data)])。"""
+    fields: dict[str, str] = {}
+    files: list[tuple[str, bytes]] = []
     for chunk in body.split(b"--" + boundary):
         if not chunk or chunk in (b"--\r\n", b"--"):
             continue
         chunk = chunk.lstrip(b"\r\n")
+        if chunk.endswith(b"\r\n"):
+            chunk = chunk[:-2]
         if b"\r\n\r\n" not in chunk:
             continue
         head, _, data = chunk.partition(b"\r\n\r\n")
-        if data.endswith(b"\r\n"):
-            data = data[:-2]
         filename = None
+        name = None
         for line in head.split(b"\r\n"):
             if b"content-disposition" in line.lower():
                 for seg in line.split(b";"):
                     seg = seg.strip()
-                    if seg.lower().startswith(b"name="):
-                        pass
+                    if seg.lower().startswith(b'name="'):
+                        name = seg[len(b'name="'):].strip(b'"').decode("utf-8", "replace")
                     if seg.lower().startswith(b"filename="):
                         filename = seg[len(b"filename="):].strip().strip(b'"').decode("utf-8", "replace")
         if filename:
             files.append((filename, data))
-    return files
+        elif name:
+            fields[name] = data.decode("utf-8", "replace")
+    return fields, files
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -131,6 +143,8 @@ class Handler(BaseHTTPRequestHandler):
             if path in ("/", "/index.html"):
                 HITS["n"] += 1
                 return self._static("index.html")
+            if path in ("/campaign", "/campaign.html"):
+                return self._static("campaign.html")
             if path.startswith("/static/"):
                 return self._static(path[len("/static/"):])
             if path == "/api/config":
@@ -171,6 +185,18 @@ class Handler(BaseHTTPRequestHandler):
                 if len(parts) > 3 and parts[3] in ("report", "download"):
                     return self._third_report(tjob)
                 return self._json(tjob.to_dict(full=True))
+            if path.startswith("/api/campaign/"):
+                parts = path.strip("/").split("/")
+                cid = parts[2] if len(parts) > 2 else ""
+                try:
+                    cjob = camp_mod.CAMP.get(cid)
+                except KeyError:
+                    return self._error("初审任务不存在或已过期", 404)
+                if len(parts) > 3 and parts[3] == "docx":
+                    return self._camp_file(cjob, "docx")
+                if len(parts) > 3 and parts[3] == "report":
+                    return self._camp_file(cjob, "md")
+                return self._json(cjob.to_dict(full=True))
             if path.startswith("/api/jobs/"):
                 parts = path.strip("/").split("/")
                 jid = parts[2] if len(parts) > 2 else ""
@@ -193,6 +219,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._upload()
             if path == "/api/third":
                 return self._third_create(parsed)
+            if path == "/api/campaign":
+                return self._camp_create()
             if path == "/api/demo":
                 sample = paths.resource("samples", "示例稿_待审.docx")
                 if not sample.exists():
@@ -489,6 +517,10 @@ class Handler(BaseHTTPRequestHandler):
     # ---------- 三审（IDML + PDF 版式检查） ----------
     def _multipart(self):
         """解析 multipart 请求，返回 [(filename, bytes)]；失败抛 ValueError。"""
+        return self._multipart_parts()[1]
+
+    def _multipart_parts(self):
+        """解析 multipart，返回 (普通字段 dict, [(filename, bytes)])；失败抛 ValueError。"""
         ctype = self.headers.get("Content-Type") or ""
         if "multipart/form-data" not in ctype:
             raise ValueError("请用 multipart/form-data 上传")
@@ -499,7 +531,7 @@ class Handler(BaseHTTPRequestHandler):
                 boundary = seg[len("boundary="):].strip('"').encode()
         if not boundary:
             raise ValueError("缺少 boundary")
-        return parse_multipart(self._body(), boundary)
+        return parse_multipart_parts(self._body(), boundary)
 
     def _third_create(self, parsed):
         files = self._multipart()
@@ -546,6 +578,39 @@ class Handler(BaseHTTPRequestHandler):
         extra = {"Content-Disposition": "attachment; filename*=UTF-8''%s" %
                                       urllib.parse.quote(p.name)}
         return self._send(200, p.read_bytes(), "text/markdown; charset=utf-8", extra)
+
+    # ---------- 活动策划案初审 ----------
+    def _camp_create(self):
+        fields, files = self._multipart_parts()
+        blob = b""
+        name = ""
+        for fn, data in files:
+            if fn.lower().endswith(".docx"):
+                blob, name = data, fn
+                break
+        if not blob:
+            return self._error("请选择 .docx 策划案")
+        kind = str(fields.get("kind") or "").strip()
+        submission = str(fields.get("submission") or "协内自用").strip()
+        try:
+            cjob = camp_mod.CAMP.create(blob, name, config_mod.load(), kind, submission)
+        except ValueError as e:
+            return self._error(e, 400)
+        return self._json(cjob.to_dict())
+
+    def _camp_file(self, cjob, which: str):
+        try:
+            if which == "docx":
+                p = camp_mod.CAMP.export_docx(cjob)
+                ctype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            else:
+                p = camp_mod.CAMP.export_md(cjob)
+                ctype = "text/markdown; charset=utf-8"
+        except ValueError as e:
+            return self._error(e, 400)
+        extra = {"Content-Disposition": "attachment; filename*=UTF-8''%s" %
+                                      urllib.parse.quote(p.name)}
+        return self._send(200, p.read_bytes(), ctype, extra)
 
     def _upload(self):
         ctype = self.headers.get("Content-Type") or ""
